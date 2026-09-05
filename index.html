@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GB10 Monitor</title>
+<style>
+  :root {
+    --bg: #000000;
+    --card: rgba(28, 28, 30, 0.72);
+    --card-line: rgba(255, 255, 255, 0.08);
+    --text: #f5f5f7;
+    --dim: #86868b;
+    --dim2: #6e6e73;
+    --ok: #32d74b;
+    --warn: #ff9f0a;
+    --hot: #ff453a;
+    --blue: #0a84ff;
+    --purple: #bf5af2;
+    --yellow: #ffd60a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(10, 132, 255, 0.14), transparent 60%),
+      radial-gradient(900px 500px at 10% 110%, rgba(191, 90, 242, 0.10), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 28px clamp(16px, 4vw, 48px) 40px;
+  }
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .chip {
+    width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+    background: linear-gradient(135deg, #0a84ff, #bf5af2);
+    box-shadow: 0 4px 14px rgba(10,132,255,.35);
+    font-size: 17px;
+  }
+  h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+  #updated { color: var(--dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .lang { margin-left: auto; display: flex; gap: 6px; }
+  .lang button {
+    background: var(--card); border: 1px solid var(--card-line); color: var(--dim);
+    font: inherit; font-size: 12px; padding: 5px 10px; border-radius: 999px; cursor: pointer;
+  }
+  .lang button.active { color: var(--text); border-color: rgba(10,132,255,.5); background: rgba(10,132,255,.1); }
+  .summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .pill {
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 999px;
+    padding: 6px 14px; font-size: 13px; color: var(--dim);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    font-variant-numeric: tabular-nums;
+  }
+  .pill b { color: var(--text); font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 22px;
+    padding: 20px 22px;
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    box-shadow: 0 12px 40px rgba(0,0,0,.45);
+    transition: transform .18s ease;
+  }
+  .card:hover { transform: translateY(-2px); }
+  .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .card-head .name { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+  .status { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--dim); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #3a3a3c; }
+  .dot.on { background: var(--ok); box-shadow: 0 0 10px rgba(50,215,75,.8); }
+  .dot.err { background: var(--hot); box-shadow: 0 0 10px rgba(255,69,58,.8); }
+  .hero { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .hero .num {
+    font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(180deg, #ffffff, #a1a1a6);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero .unit { font-size: 18px; color: var(--dim); font-weight: 600; }
+  .hero .sub { margin-left: auto; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.09); overflow: hidden; margin: 6px 0 14px; }
+  .bar > i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #32d74b, #0a84ff); transition: width .6s ease; }
+  .bar.temp > i { background: linear-gradient(90deg, #0a84ff, #ff9f0a); }
+  .bar.temp.hot > i { background: linear-gradient(90deg, #ff9f0a, #ff453a); }
+  .bar.clock > i { background: linear-gradient(90deg, #bf5af2, #0a84ff); }
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+  .m .k { font-size: 11px; color: var(--dim2); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
+  .m .v { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .m .v small { color: var(--dim); font-weight: 500; font-size: 12px; }
+  .m .v.hot { color: var(--hot); }
+  .m .v.warn { color: var(--warn); }
+  .m.thermal { grid-column: 1 / -1; }
+  .thermal-top { display: flex; align-items: baseline; gap: 10px; }
+  .thermal-level { font-size: 11px; font-weight: 750; padding: 3px 10px; border-radius: 999px; border: 1px solid transparent; }
+  .thermal-level.ok { color: var(--ok); border-color: rgba(50,215,75,.4); background: rgba(50,215,75,.08); }
+  .thermal-level.caution { color: var(--yellow); border-color: rgba(255,214,10,.4); background: rgba(255,214,10,.08); }
+  .thermal-level.high { color: var(--warn); border-color: rgba(255,159,10,.4); background: rgba(255,159,10,.08); }
+  .thermal-level.critical { color: var(--hot); border-color: rgba(255,69,58,.4); background: rgba(255,69,58,.08); }
+  .peak-warn { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 750; color: var(--hot); padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(255,69,58,.4); background: rgba(255,69,58,.08); }
+  .thermal-stats { display: flex; gap: 14px; font-size: 12px; color: var(--dim); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .sparkline { display: block; width: 100%; height: 30px; margin-top: 8px; }
+  .thermal-zone { font-size: 11px; color: var(--dim2); margin-top: 3px; }
+  .errbox { margin-top: 10px; font-size: 13px; color: var(--hot); background: rgba(255,69,58,.08); border: 1px solid rgba(255,69,58,.25); border-radius: 10px; padding: 10px 12px; word-break: break-all; }
+  .placeholder { color: var(--dim); font-size: 14px; padding: 8px 0; }
+  footer { margin-top: 26px; color: var(--dim2); font-size: 12px; }
+  footer .note { margin-top: 4px; color: var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="chip">&#9889;</div>
+    <h1 id="title">GB10 Monitor</h1>
+  </div>
+  <span id="updated"></span>
+  <nav class="lang" aria-label="Language">
+    <button type="button" data-lang="en">EN</button>
+    <button type="button" data-lang="ja">日本語</button>
+    <button type="button" data-lang="zh">中文</button>
+  </nav>
+</header>
+<div class="summary" id="summary"></div>
+<div class="grid" id="grid"></div>
+<footer>
+  <div id="footer"></div>
+  <div class="note" id="footer-note"></div>
+</footer>
+<script>
+"use strict";
+const I18N = {
+  en: {
+    title: "GB10 Monitor",
+    online: "Online", offline: "OFFLINE", onlineStatus: "ONLINE",
+    maxGpuTemp: "Max GPU Temp", totalPower: "Total Power", updated: "Updated",
+    gpuSensorNone: "GPU sensor no response",
+    clock: "Clock", gpuUtil: "GPU Util", memory: "Memory",
+    maxThermalZone: "Max Thermal Zone",
+    oneMinuteAvg: "1m avg", fiveMinuteMax: "5m max",
+    peakWarn: "Peak warning",
+    hottestSensor: "Hottest sensor",
+    loadAvg: "Load Avg",
+    levelNormal: "Normal", levelCaution: "Caution", levelHigh: "High", levelCritical: "Action",
+    footer: "SSH poll every {pollMs}s · add hosts in config.json",
+    footerNote: "Thresholds are operational heuristics, not NVIDIA/Lenovo/ASUS thermal limits.",
+    fetchError: "Fetch error"
+  },
+  ja: {
+    title: "GB10 Monitor",
+    online: "オンライン", offline: "オフライン", onlineStatus: "ONLINE",
+    maxGpuTemp: "最大GPU温度", totalPower: "合計消費電力", updated: "更新",
+    gpuSensorNone: "GPU センサー応答なし",
+    clock: "Clock", gpuUtil: "GPU使用率", memory: "メモリ",
+    maxThermalZone: "最大熱ゾーン",
+    oneMinuteAvg: "1分平均", fiveMinuteMax: "5分最大",
+    peakWarn: "ピーク警告",
+    hottestSensor: "最高センサー",
+    loadAvg: "ロード平均",
+    levelNormal: "正常", levelCaution: "注意", levelHigh: "高温", levelCritical: "要対応",
+    footer: "SSH で {pollMs} 秒間隔取得 · ホストは config.json に追加",
+    footerNote: "閾値は運用上の目安であり、NVIDIA/Lenovo/ASUS の保証熱限界ではありません。",
+    fetchError: "取得エラー"
+  },
+  zh: {
+    title: "GB10 监控",
+    online: "在线", offline: "离线", onlineStatus: "ONLINE",
+    maxGpuTemp: "最高GPU温度", totalPower: "总功耗", updated: "更新",
+    gpuSensorNone: "GPU 传感器无响应",
+    clock: "频率", gpuUtil: "GPU利用率", memory: "内存",
+    maxThermalZone: "最高温度区域",
+    oneMinuteAvg: "1分钟平均", fiveMinuteMax: "5分钟最高",
+    peakWarn: "峰值警告",
+    hottestSensor: "最高温度传感器",
+    loadAvg: "负载平均",
+    levelNormal: "正常", levelCaution: "注意", levelHigh: "高温", levelCritical: "需处理",
+    footer: "SSH 每 {pollMs} 秒采集 · 在 config.json 中添加主机",
+    footerNote: "阈值为运行参考值，并非 NVIDIA/Lenovo/ASUS 的保证热限值。",
+    fetchError: "获取错误"
+  }
+};
+
+const grid = document.getElementById("grid");
+const updated = document.getElementById("updated");
+const summary = document.getElementById("summary");
+const footer = document.getElementById("footer");
+const footerNote = document.getElementById("footer-note");
+const titleEl = document.getElementById("title");
+
+const LANG_KEY = "gb10-lang";
+function detectLang() {
+  try {
+    const saved = localStorage.getItem(LANG_KEY);
+    if (saved && I18N[saved]) return saved;
+  } catch (e) {}
+  const nav = ((navigator.languages && navigator.languages[0]) || navigator.language || "").toLowerCase();
+  if (nav.startsWith("ja")) return "ja";
+  if (nav.startsWith("zh")) return "zh";
+  return "en";
+}
+let LANG = detectLang();
+const t = (k) => (I18N[LANG] && I18N[LANG][k]) ?? I18N.en[k];
+
+function setLang(l) {
+  if (!I18N[l]) return;
+  LANG = l;
+  try { localStorage.setItem(LANG_KEY, l); } catch (e) {}
+  document.querySelectorAll("[data-lang]").forEach((b) => b.classList.toggle("active", b.dataset.lang === l));
+  document.documentElement.lang = l === "ja" ? "ja" : l === "zh" ? "zh-CN" : "en";
+  titleEl.textContent = t("title");
+  if (lastData) render(lastData);
+}
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+function fmtBytes(b) {
+  if (b == null) return "—";
+  return (b / 1024 ** 3).toFixed(1) + " GB";
+}
+
+function sparkline(points, th) {
+  if (!points || points.length < 2) return "";
+  const w = 100, h = 30;
+  const values = points.map((p) => p.v);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = (max - min) || 1;
+  const pts = points.map((p, i) => {
+    const x = (i / (points.length - 1)) * w;
+    const y = h - 2 - ((p.v - min) / span) * (h - 4);
+    return x.toFixed(1) + "," + y.toFixed(1);
+  }).join(" ");
+  const color = max >= th.peak ? "#ff453a" : max >= th.socWarn ? "#ff9f0a" : "#0a84ff";
+  return '<svg class="sparkline" viewBox="0 0 ' + w + " " + h + '" preserveAspectRatio="none" aria-hidden="true">' +
+    '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+    "</svg>";
+}
+
+function thermalLevel(avg, th) {
+  if (avg == null) return null;
+  if (avg >= th.socHot) return { label: t("levelCritical"), cls: "critical" };
+  if (avg >= th.socWarn) return { label: t("levelHigh"), cls: "high" };
+  if (avg >= th.socNote) return { label: t("levelCaution"), cls: "caution" };
+  return { label: t("levelNormal"), cls: "ok" };
+}
+
+function card(h, th) {
+  const dot = h.online ? "on" : "err";
+  const label = esc(h.label);
+  if (!h.online) {
+    return '<div class="card"><div class="card-head"><span class="name">' + label +
+      '</span><span class="status"><span class="dot ' + dot + '"></span>' + esc(t("offline")) + '</span></div>' +
+      '<div class="errbox">' + esc(h.error || "connection failed") + "</div></div>";
+  }
+  const g = h.gpu || {};
+  const mem = h.mem || {};
+  const hasGpu = g.tempC != null;
+  const tempC = g.tempC;
+  const tempPct = hasGpu ? Math.max(4, Math.min(100, tempC)) : 0;
+  const gpuHot = tempC != null && tempC >= th.gpuHot;
+  const memPct = (mem.totalBytes && mem.usedBytes != null) ? Math.round(mem.usedBytes / mem.totalBytes * 100) : 0;
+  const clockPct = (g.smMhz != null && g.smMaxMhz) ? Math.round(g.smMhz / g.smMaxMhz * 100) : 0;
+  const powerW = g.powerW;
+  const util = g.utilPct;
+  const thermo = h.thermalTempC;
+  const load = h.loadAvg;
+
+  const hero = hasGpu
+    ? '<div class="hero"><span class="num">' + tempC + '</span><span class="unit">°C</span>' +
+      '<span class="sub">GPU / ' + (powerW != null ? powerW.toFixed(1) : "—") + ' W</span></div>' +
+      '<div class="bar temp' + (gpuHot ? " hot" : "") + '"><i style="width:' + tempPct + '%"></i></div>'
+    : '<div class="placeholder">' + esc(t("gpuSensorNone")) + "</div>";
+
+  const clock = (g.smMhz != null)
+    ? '<div class="m"><div class="k">' + esc(t("clock")) + '</div><div class="v">' + g.smMhz + ' <small>/ ' + g.smMaxMhz + ' MHz (' + clockPct + '%)</small></div>' +
+      '<div class="bar clock"><i style="width:' + clockPct + '%"></i></div></div>'
+    : '<div class="m"><div class="k">' + esc(t("clock")) + '</div><div class="v">—</div></div>';
+
+  const utilM = '<div class="m"><div class="k">' + esc(t("gpuUtil")) + '</div><div class="v">' +
+    (util != null ? util : "—") + (util != null ? " <small>%</small>" : "") + "</div></div>";
+
+  const memM = '<div class="m"><div class="k">' + esc(t("memory")) + '</div><div class="v">' + memPct + ' <small>%</small></div>' +
+    '<div style="font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;margin-top:1px">' +
+    fmtBytes(mem.usedBytes) + " / " + fmtBytes(mem.totalBytes) + "</div></div>";
+
+  const thermo1m = h.thermal1mAvg;
+  const thermo5m = h.thermal5mMax;
+  const hotZone = h.hottestZone;
+  const level = thermalLevel(thermo1m, th);
+  const peak = thermo5m != null && thermo5m >= th.peak;
+  const hotVal = level && (level.cls === "high" || level.cls === "critical");
+  const thermal = '<div class="m thermal"><div class="k">' + esc(t("maxThermalZone")) + "</div>" +
+    '<div class="thermal-top"><div class="v' + (hotVal ? " hot" : "") + '">' + (thermo != null ? thermo.toFixed(1) : "—") +
+    (thermo != null ? " <small>°C</small>" : "") + "</div>" +
+    (level ? '<span class="thermal-level ' + level.cls + '">' + esc(level.label) + '</span>' : "") + "</div>" +
+    '<div class="thermal-stats"><span>' + esc(t("oneMinuteAvg")) + " " + (thermo1m != null ? thermo1m.toFixed(1) + "℃" : "—") + "</span>" +
+    "<span>" + esc(t("fiveMinuteMax")) + " " + (thermo5m != null ? thermo5m.toFixed(1) + "℃" : "—") + "</span></div>" +
+    (peak ? '<span class="peak-warn">' + esc(t("peakWarn")) + ": " + thermo5m.toFixed(1) + "℃ (≥ " + th.peak + "℃)</span>" : "") +
+    sparkline(h.thermalHistory, th) +
+    (hotZone ? '<div class="thermal-zone">' + esc(t("hottestSensor")) + ": " + esc(hotZone.zone) + " (" + esc(hotZone.type) + ")</div>" : "") +
+    "</div>";
+
+  const loadM = '<div class="m"><div class="k">' + esc(t("loadAvg")) + '</div><div class="v">' +
+    (load && load.length ? load.map((x) => x.toFixed(2)).join(" / ") : "—") + "</div></div>";
+
+  return '<div class="card"><div class="card-head"><span class="name">' + label +
+    '</span><span class="status"><span class="dot ' + dot + '"></span>' + esc(t("onlineStatus")) + '</span></div>' +
+    hero + '<div class="metrics">' + clock + utilM + memM + thermal + loadM + "</div></div>";
+}
+
+let lastData = null;
+
+function render(data) {
+  lastData = data;
+  const th = data.thresholds || { gpuWarn: 75, gpuHot: 85, socNote: 85, socWarn: 90, socHot: 93, peak: 95 };
+  grid.innerHTML = data.hosts.map((h) => card(h, th)).join("");
+  const online = data.hosts.filter((h) => h.online).length;
+  const temps = data.hosts.filter((h) => h.online && h.gpu && h.gpu.tempC != null).map((h) => h.gpu.tempC);
+  const maxT = temps.length ? Math.max.apply(null, temps) : null;
+  const watts = data.hosts.filter((h) => h.online && h.gpu && h.gpu.powerW != null).map((h) => h.gpu.powerW);
+  const sumW = watts.length ? watts.reduce((a, b) => a + b, 0) : null;
+  summary.innerHTML =
+    '<span class="pill">' + esc(t("online")) + " <b>" + online + " / " + data.hosts.length + "</b></span>" +
+    '<span class="pill">' + esc(t("maxGpuTemp")) + " <b>" + (maxT != null ? maxT + " °C" : "—") + "</b></span>" +
+    '<span class="pill">' + esc(t("totalPower")) + " <b>" + (sumW != null ? sumW.toFixed(1) + " W" : "—") + "</b></span>";
+  updated.textContent = t("updated") + " " + new Date(data.ts).toLocaleTimeString() + " · " + (data.pollMs / 1000) + "s";
+  footer.textContent = t("footer").replace("{pollMs}", (data.pollMs / 1000));
+  footerNote.textContent = t("footerNote");
+}
+
+async function loop() {
+  try {
+    const r = await fetch("/api/status", { cache: "no-store" });
+    const data = await r.json();
+    render(data);
+  } catch (e) {
+    updated.textContent = t("fetchError") + ": " + e.message;
+  }
+  setTimeout(loop, 1500);
+}
+
+document.querySelectorAll("[data-lang]").forEach((b) => {
+  b.addEventListener("click", () => setLang(b.dataset.lang));
+});
+setLang(LANG);
+loop();
+</script>
+</body>
+</html>

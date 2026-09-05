@@ -1,0 +1,17 @@
+{
+  "port": 8910,
+  "pollMs": 5000,
+  "sshTimeoutMs": 8000,
+  "hosts": [
+    { "ssh": "gb10-1", "label": "GB10 node 1" },
+    { "ssh": "gb10-2", "label": "GB10 node 2" }
+  ],
+  "thresholds": {
+    "gpuWarn": 75,
+    "gpuHot": 85,
+    "socNote": 85,
+    "socWarn": 90,
+    "socHot": 93,
+    "peak": 95
+  }
+}

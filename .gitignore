@@ -1,0 +1,7 @@
+# local config (hosts / port / thresholds) — copy config.example.json to config.json and edit.
+config.json
+
+# runtime
+*.log
+node_modules/
+.DS_Store

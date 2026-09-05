@@ -1,0 +1,29 @@
+{
+  "name": "gb10-monitor",
+  "version": "0.1.0",
+  "description": "A tiny, zero-dependency web monitor for NVIDIA GB10 systems — DGX Spark, ThinkStation PGX, ASUS GX10, and compatible Linux hosts.",
+  "license": "MIT",
+  "main": "server.js",
+  "bin": {
+    "gb10-monitor": "server.js"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "keywords": [
+    "gb10",
+    "dgx-spark",
+    "nvidia",
+    "jetpack",
+    "thermal",
+    "temperature",
+    "monitor",
+    "ssh",
+    "homelab",
+    "llm",
+    "vllm"
+  ]
+}
