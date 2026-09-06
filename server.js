@@ -135,9 +135,17 @@ function parseRemote(out) {
 let cache = { ts: 0, hosts: [] };
 let running = null;
 
-const HISTORY_MS = 5 * 60 * 1000;
 const ONE_MINUTE_MS = 60 * 1000;
+const FIVE_MINUTE_MS = 5 * 60 * 1000;
+const FIFTEEN_MINUTE_MS = 15 * 60 * 1000;
+const HISTORY_MS = FIFTEEN_MINUTE_MS;
 const histories = new Map();
+
+function windowAvg(hist, now, windowMs) {
+  const w = hist.filter((p) => now - p.t <= windowMs);
+  if (!w.length) return null;
+  return Math.round((w.reduce((a, p) => a + p.v, 0) / w.length) * 10) / 10;
+}
 
 async function refresh() {
   const now = Date.now();
@@ -147,9 +155,11 @@ async function refresh() {
     if (!hist) { hist = []; histories.set(host.label, hist); }
     if (host.online && host.thermalTempC != null) hist.push({ t: now, v: host.thermalTempC });
     while (hist.length && now - hist[0].t > HISTORY_MS) hist.shift();
-    const lastMin = hist.filter((p) => now - p.t <= ONE_MINUTE_MS);
-    host.thermal1mAvg = lastMin.length ? Math.round((lastMin.reduce((a, p) => a + p.v, 0) / lastMin.length) * 10) / 10 : null;
-    host.thermal5mMax = hist.length ? Math.round(Math.max(...hist.map((p) => p.v)) * 10) / 10 : null;
+    host.thermal1mAvg = windowAvg(hist, now, ONE_MINUTE_MS);
+    host.thermal5mAvg = windowAvg(hist, now, FIVE_MINUTE_MS);
+    host.thermal15mAvg = windowAvg(hist, now, FIFTEEN_MINUTE_MS);
+    const last5m = hist.filter((p) => now - p.t <= FIVE_MINUTE_MS);
+    host.thermal5mMax = last5m.length ? Math.round(Math.max(...last5m.map((p) => p.v)) * 10) / 10 : null;
     host.thermalHistory = hist.map((p) => ({ t: p.t, v: p.v }));
   }
   cache = { ts: now, hosts: results };

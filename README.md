@@ -14,11 +14,17 @@ For each host it shows:
 
 - GPU temperature / power / utilization
 - Unified memory, load average
-- **Hottest thermal zone** (current value, 1-minute average, 5-minute maximum, and a small 5-minute sparkline)
+- **Hottest thermal zone** (current value plus 1-minute, 5-minute and 15-minute averages, and a 5-minute maximum)
+- A small sparkline of recent thermal readings
 - Which zone is hottest (`thermal_zone0 (acpitz)`, etc.) — it does not assume one zone is the SoC
-- A single-screen status per host, judged by the **1-minute average, not the instant value**
+- A one-glance status per host, judged by the **1-minute average, not the instant value**
 
-The dashboard is available in **English, Japanese, and Simplified Chinese** (auto-detected from the browser, switchable in the top-right).
+Two views, switchable from the top of the page:
+
+- **Detail** — the full per-host breakdown above
+- **Summary** — a compact, mobile-friendly grid that fits **all hosts on one phone screen** (each host shows online state, status, current thermal value, the 1m/5m/15m averages and a mini sparkline)
+
+The layout is responsive, and the dashboard is available in **English, Japanese, and Simplified Chinese** (auto-detected from the browser, switchable in the top-right). On a narrow screen it opens in the Summary view.
 
 > It is deliberately **not** a full cluster manager. It intentionally does not try to be. If you need multi-node orchestration, LLM server metrics, benchmarks, or power control, use a dedicated tool. This one is thermal-first and SSH-only.
 
