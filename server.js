@@ -40,6 +40,8 @@ const REMOTE_CMD = [
   "free -b | grep '^Mem:'",
   "echo =THERMAL=",
   "for z in /sys/class/thermal/thermal_zone*; do v=\$(cat \$z/temp 2>/dev/null); [ -n \"\$v\" ] || continue; t=\$(cat \$z/type 2>/dev/null); [ -n \"\$t\" ] || t=-; echo \"\$z \$t \$v\"; done",
+  "echo =MODEL=",
+  "for f in sys_vendor product_name product_version; do echo \"\$f=\$(cat /sys/class/dmi/id/\$f 2>/dev/null)\"; done",
   "echo =LOAD=",
   "cut -d' ' -f1-3 /proc/loadavg",
 ].join("; ");
@@ -127,6 +129,25 @@ function parseRemote(out) {
     r.thermalZones = zones;
     r.hottestZone = zones.reduce((a, b) => (b.tempC > a.tempC ? b : a), zones[0]);
   }
+  const model = {};
+  for (const line of sections.MODEL || []) {
+    const i = line.indexOf("=");
+    if (i < 0) continue;
+    model[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+  }
+  const vendor = model.sys_vendor || null;
+  const productName = model.product_name || null;
+  const productVersion = model.product_version || null;
+  if (vendor || productName || productVersion) {
+    const vendorShort = (vendor || "").trim().split(/\s+/)[0] || null;
+    const skuLike = /^[A-Z0-9_-]{7,}$/.test(productName || "");
+    const modelName = productName && !skuLike ? productName : (productVersion || productName || null);
+    r.vendor = vendor;
+    r.productName = productName;
+    r.productVersion = productVersion;
+    r.model = modelName;
+    r.modelLabel = [vendorShort, modelName].filter(Boolean).join(" · ") || null;
+  }
   const load = (sections.LOAD || [])[0];
   if (load) r.loadAvg = load.split(" ").map(Number);
   return r;
@@ -149,7 +170,15 @@ function windowAvg(hist, now, windowMs) {
 
 async function refresh() {
   const now = Date.now();
-  const results = await Promise.all(config.hosts.map((h) => sshHost(h).then((r) => ({ label: h.label, ssh: h.ssh, ...r }))));
+  const results = await Promise.all(config.hosts.map((h) => sshHost(h).then((r) => {
+    const out = { label: h.label, ssh: h.ssh, ...r };
+    if (h.model) {
+      out.model = h.model;
+      const vs = out.vendorShort || ((out.vendor || "").trim().split(/\s+/)[0]) || "";
+      out.modelLabel = [vs, h.model].filter(Boolean).join(" · ") || h.model;
+    }
+    return out;
+  })));
   for (const host of results) {
     let hist = histories.get(host.label);
     if (!hist) { hist = []; histories.set(host.label, hist); }

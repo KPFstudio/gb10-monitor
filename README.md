@@ -12,12 +12,15 @@ This tool answers one question at a glance: **is the cluster actually hot, or di
 
 For each host it shows:
 
+- **Vendor + product name, auto-detected** from the host's DMI (`sys_vendor` / `product_name` / `product_version`) — e.g. `LENOVO · ThinkStation PGX`, `ASUSTeK · GX10`, `NVIDIA · DGX Spark`. It works for any GB10 system (DGX Spark, ThinkStation PGX, ASUS GX10, MSI, and other compatible Linux hosts); you can override the detected name per host in `config.json`.
 - GPU temperature / power / utilization
 - Unified memory, load average
 - **Hottest thermal zone** (current value plus 1-minute, 5-minute and 15-minute averages, and a 5-minute maximum)
 - A small sparkline of recent thermal readings
 - Which zone is hottest (`thermal_zone0 (acpitz)`, etc.) — it does not assume one zone is the SoC
 - A one-glance status per host, judged by the **1-minute average, not the instant value**
+
+**Any number of hosts works** — 1, 2, 4, 6 or more. Just list them in `config.json`; the grid auto-lays-out (and the Summary view on a phone keeps the most recent ones on one screen).
 
 Two views, switchable from the top of the page:
 
@@ -80,7 +83,11 @@ Edit `config.json`:
 ```
 
 - `hosts[].ssh` is the SSH alias / host from step 1.
+- `hosts[].label` is the display name (optional — the vendor + product name is auto-detected anyway).
+- `hosts[].model` is an optional manual override for the detected product name.
 - `port`, `pollMs`, `sshTimeoutMs` are optional. `PORT` env var overrides `port`.
+
+> **LLM / agent friendly:** the config is deliberately small and self-explanatory. Cloning, `cp config.example.json config.json`, editing the `hosts` array, then `node server.js` is all there is — one heading per step above.
 
 ## 3. Run
 
