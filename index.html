@@ -69,7 +69,7 @@
   }
   .card:hover { transform: translateY(-2px); }
   .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-  .card-head .name { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+  .card-head .name { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card-title { min-width: 0; }
   .model { display: block; font-size: 11px; color: var(--dim2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--dim); }
@@ -123,7 +123,7 @@
   }
   .mini-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; min-width: 0; }
   .mini-title { min-width: 0; }
-  .mini-name { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .mini-name { display: block; font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .mini-title .model { font-size: 10px; margin-top: 1px; }
   .mini-level { margin-left: auto; flex: none; font-size: 10px; font-weight: 750; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; }
   .mini-level.ok { color: var(--ok); border-color: rgba(50,215,75,.4); background: rgba(50,215,75,.08); }
@@ -340,7 +340,7 @@ function card(h, th) {
   const label = esc(h.label);
   const model = h.modelLabel ? '<span class="model">' + esc(h.modelLabel) + '</span>' : "";
   if (!h.online) {
-    return '<div class="card"><div class="card-head"><div class="card-title"><span class="name">' + label + '</span>' + model +
+    return '<div class="card"><div class="card-head"><div class="card-title"><span class="name" title="' + label + '">' + label + '</span>' + model +
       '</div><span class="status"><span class="dot ' + dot + '"></span>' + esc(t("offline")) + '</span></div>' +
       '<div class="errbox">' + esc(h.error || "connection failed") + "</div></div>";
   }
@@ -402,7 +402,7 @@ function card(h, th) {
   const loadM = '<div class="m"><div class="k">' + esc(t("loadAvg")) + '</div><div class="v">' +
     (load && load.length ? load.map((x) => x.toFixed(2)).join(" / ") : "—") + "</div></div>";
 
-  return '<div class="card"><div class="card-head"><div class="card-title"><span class="name">' + label + '</span>' + model +
+  return '<div class="card"><div class="card-head"><div class="card-title"><span class="name" title="' + label + '">' + label + '</span>' + model +
     '</div><span class="status"><span class="dot ' + dot + '"></span>' + esc(t("onlineStatus")) + '</span></div>' +
     hero + '<div class="metrics">' + clock + utilM + memM + thermal + loadM + "</div></div>";
 }
@@ -413,7 +413,7 @@ function miniCard(h, th) {
   const model = h.modelLabel ? '<span class="model">' + esc(h.modelLabel) + '</span>' : "";
   if (!h.online) {
     return '<div class="mini-card"><div class="mini-head"><span class="dot ' + dot + '"></span>' +
-      '<div class="mini-title"><span class="mini-name">' + label + '</span>' + model + '</div>' +
+      '<div class="mini-title"><span class="mini-name" title="' + label + '">' + label + '</span>' + model + '</div>' +
       '<span class="mini-off">' + esc(t("offline")) + '</span></div></div>';
   }
   const thermo = h.thermalTempC;
@@ -429,7 +429,7 @@ function miniCard(h, th) {
   const gpuWarn = gpuTemp != null && gpuTemp >= th.gpuWarn;
   return '<div class="mini-card">' +
     '<div class="mini-head"><span class="dot ' + dot + '"></span>' +
-    '<div class="mini-title"><span class="mini-name">' + label + '</span>' + model + '</div>' +
+    '<div class="mini-title"><span class="mini-name" title="' + label + '">' + label + '</span>' + model + '</div>' +
     (level ? '<span class="mini-level ' + level.cls + '">' + esc(level.label) + '</span>' : "") + "</div>" +
     '<div class="mini-temps">' +
       '<div class="mini-temp"><span class="mini-lbl">' + esc(t("gpuTemp")) + '</span><span class="mini-val small' + (gpuHot ? " hot" : gpuWarn ? " warn" : "") + '">' + (gpuTemp != null ? gpuTemp.toFixed(0) : "—") + '<small>°C</small></span></div>' +
