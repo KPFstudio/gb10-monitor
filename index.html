@@ -131,10 +131,11 @@
   .mini-level.high { color: var(--warn); border-color: rgba(255,159,10,.4); background: rgba(255,159,10,.08); }
   .mini-level.critical { color: var(--hot); border-color: rgba(255,69,58,.4); background: rgba(255,69,58,.08); }
   .mini-off { margin-left: auto; flex: none; font-size: 10px; color: var(--hot); }
-  .mini-temps { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
-  .mini-temp { min-width: 0; }
-  .mini-lbl { font-size: 10px; color: var(--dim2); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mini-val { font-size: 20px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .mini-temps { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+  .mini-temp { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+  .mini-lbl { font-size: 10px; color: var(--dim2); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini-val { font-size: 20px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; flex: none; }
+  .mini-val.small { font-size: 15px; font-weight: 600; }
   .mini-val small { color: var(--dim); font-weight: 500; font-size: 12px; }
   .mini-val.hot { color: var(--hot); }
   .mini-val.warn { color: var(--warn); }
@@ -150,7 +151,7 @@
     .controls { gap: 6px; }
     .card { padding: 14px; border-radius: 16px; }
     .grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
-    .grid-summary { grid-template-columns: 1fr; gap: 10px; }
+    .grid-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   }
   @media (max-width: 380px) {
     .grid-summary { grid-template-columns: 1fr; }
@@ -431,10 +432,8 @@ function miniCard(h, th) {
     '<div class="mini-title"><span class="mini-name">' + label + '</span>' + model + '</div>' +
     (level ? '<span class="mini-level ' + level.cls + '">' + esc(level.label) + '</span>' : "") + "</div>" +
     '<div class="mini-temps">' +
-      '<div class="mini-temp"><div class="mini-lbl">' + esc(t("gpuTemp")) + '</div>' +
-        '<div class="mini-val' + (gpuHot ? " hot" : gpuWarn ? " warn" : "") + '">' + (gpuTemp != null ? gpuTemp.toFixed(0) : "—") + '<small>°C</small></div></div>' +
-      '<div class="mini-temp"><div class="mini-lbl">' + esc(t("maxThermalZone")) + '</div>' +
-        '<div class="mini-val' + (level && (level.cls === "high" || level.cls === "critical") ? " hot" : "") + '">' + (thermo != null ? thermo.toFixed(1) : "—") + '<small>°C</small></div></div>' +
+      '<div class="mini-temp"><span class="mini-lbl">' + esc(t("gpuTemp")) + '</span><span class="mini-val small' + (gpuHot ? " hot" : gpuWarn ? " warn" : "") + '">' + (gpuTemp != null ? gpuTemp.toFixed(0) : "—") + '<small>°C</small></span></div>' +
+      '<div class="mini-temp"><span class="mini-lbl">' + esc(t("maxThermalZone")) + '</span><span class="mini-val' + (level && (level.cls === "high" || level.cls === "critical") ? " hot" : "") + '">' + (thermo != null ? thermo.toFixed(1) : "—") + '<small>°C</small></span></div>' +
     "</div>" +
     '<div class="mini-stats"><span>' + esc(t("oneMinuteAvg")) + " <b>" + fmt1(thermo1m) + "</b></span>" +
       "<span>" + esc(t("fiveMinuteAvg")) + " <b>" + fmt1(thermo5a) + "</b></span>" +
