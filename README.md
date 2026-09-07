@@ -2,6 +2,8 @@
 
 A tiny, zero-dependency web monitor for NVIDIA GB10 systems — DGX Spark, ThinkStation PGX, ASUS GX10, and compatible Linux hosts.
 
+日本語はこちら: [README.ja.md](README.ja.md)（[English](README.md)）
+
 It polls each host over SSH (GPU, memory, all thermal zones, load average) and serves a single auto-refreshing dashboard built for quick glances from a phone. Lightweight by design: no Docker, no database, no Prometheus, no auth.
 
 ## Why this exists
