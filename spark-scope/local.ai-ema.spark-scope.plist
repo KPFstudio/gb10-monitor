@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>local.ai-ema.spark-scope</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/yourname/.local/bin/node</string>
+    <string>/Users/yourname/ForClaudeCode/gb10-monitor/spark-scope/server.mjs</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/yourname/ForClaudeCode/gb10-monitor/spark-scope</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>SPARK_SCOPE_HOST</key>
+    <string>127.0.0.1</string>
+    <key>SPARK_SCOPE_PORT</key>
+    <string>8914</string>
+    <key>SPARK_SCOPE_API_URL</key>
+    <string>http://127.0.0.1:8093</string>
+    <key>SPARK_SCOPE_ALLOWED_HOSTS</key>
+    <string>your-mac.your-tailnet.ts.net</string>
+    <key>SPARK_SCOPE_TOPOLOGY</key>
+    <string>/Users/yourname/ForClaudeCode/gb10-monitor/spark-scope/topology.local.json</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/yourname/Library/Logs/spark-scope.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/yourname/Library/Logs/spark-scope.err.log</string>
+</dict>
+</plist>

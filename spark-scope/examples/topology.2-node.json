@@ -1,0 +1,16 @@
+{
+  "nodes": [
+    {"id": "1", "name": "spark-1", "host": "local", "role": "HEAD", "hardware": "DGX Spark"},
+    {"id": "2", "name": "spark-2", "host": "spark-2", "role": "WORKER", "hardware": "DGX Spark"}
+  ],
+  "links": [
+    { "id": "1-2a", "ends": [
+      {"node": "1", "a": "enp1s0f0np0", "b": "enP2p1s0f0np0"},
+      {"node": "2", "a": "enp1s0f0np0", "b": "enP2p1s0f0np0"}
+    ] },
+    { "id": "1-2b", "ends": [
+      {"node": "1", "a": "enp1s0f1np1", "b": "enP2p1s0f1np1"},
+      {"node": "2", "a": "enp1s0f1np1", "b": "enP2p1s0f1np1"}
+    ] }
+  ]
+}

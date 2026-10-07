@@ -1,0 +1,34 @@
+# Example systemd *user* unit for Spark Scope. Copy, then edit the paths and settings marked below.
+#
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/spark-scope.service.example ~/.config/systemd/user/spark-scope.service
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now spark-scope
+#   journalctl --user -u spark-scope -f
+#
+# A user unit stops when you log out unless lingering is enabled for your account:
+#   sudo loginctl enable-linger "$USER"
+[Unit]
+Description=Spark Scope (read-only DGX Spark monitoring dashboard)
+
+[Service]
+# Edit: where you cloned or copied spark-scope, and the node binary (see `command -v node`, Node 22.13 or later).
+WorkingDirectory=%h/spark-scope
+ExecStart=/usr/bin/node %h/spark-scope/server.mjs
+
+# Edit as needed; every setting is optional (see README.md).
+Environment=SPARK_SCOPE_HOST=127.0.0.1
+Environment=SPARK_SCOPE_PORT=8787
+Environment=SPARK_SCOPE_API_URL=http://127.0.0.1:8000
+# Without this, ~/.config/spark-scope/topology.json is used when it exists, else the shipped topology.json.
+#Environment=SPARK_SCOPE_TOPOLOGY=%h/.config/spark-scope/topology.json
+#Environment=SPARK_SCOPE_USAGE_DB=%h/.local/share/spark-scope/usage.sqlite
+#Environment=SPARK_SCOPE_TIME_ZONE=Etc/UTC
+
+# ssh forwards LC_ALL; if a node lacks that locale, every poll prints a locale warning.
+UnsetEnvironment=LC_ALL
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

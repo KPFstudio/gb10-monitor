@@ -1,0 +1,10 @@
+# Autostart entry for the Spark Scope rack panel. Install as ~/.config/autostart/spark-scope-kiosk.desktop.
+# Replace YOUR_USER with your account name. To show a dashboard running on another machine, change the URL
+# (keep /rack/ at the end). lwrespawn (Raspberry Pi OS) restarts the kiosk if Chromium exits; on other
+# systems drop "/usr/bin/lwrespawn" and start the script directly.
+[Desktop Entry]
+Type=Application
+Name=Spark Scope rack panel
+Comment=Full-screen Spark Scope rack panel
+Exec=env SPARK_SCOPE_RACK_URL=http://127.0.0.1:8787/rack/ /usr/bin/lwrespawn /home/YOUR_USER/.local/bin/spark-scope-kiosk
+X-GNOME-Autostart-enabled=true

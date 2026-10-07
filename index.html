@@ -49,6 +49,12 @@
     font: inherit; font-size: 12px; padding: 5px 10px; border-radius: 999px; cursor: pointer;
   }
   .views button.active, .lang button.active { color: var(--text); border-color: rgba(10,132,255,.5); background: rgba(10,132,255,.1); }
+  .header-link {
+    background: var(--card); border: 1px solid var(--card-line); color: var(--dim);
+    font: inherit; font-size: 12px; padding: 5px 10px; border-radius: 999px;
+    text-decoration: none;
+  }
+  .header-link:hover, .header-link:focus-visible { color: var(--text); border-color: rgba(10,132,255,.5); background: rgba(10,132,255,.1); }
   .summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
   .legend { font-size: 12px; color: var(--dim); margin-bottom: 18px; max-width: 68ch; line-height: 1.5; }
   .pill {
@@ -175,6 +181,7 @@
       <button type="button" data-lang="ja">日本語</button>
       <button type="button" data-lang="zh">中文</button>
     </nav>
+    <a class="header-link" href="https://your-mac.your-tailnet.ts.net:8914/" target="_blank" rel="noopener noreferrer">Spark Scope</a>
   </div>
 </header>
 <div class="summary" id="summary"></div>

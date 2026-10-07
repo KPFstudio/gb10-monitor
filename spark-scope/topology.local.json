@@ -1,0 +1,9 @@
+{
+  "nodes": [
+    { "id": "dgx1", "name": "DGX1", "host": "dgx1", "role": "HEAD", "hardware": "Lenovo ThinkStation PGX" },
+    { "id": "dgx2", "name": "DGX2", "host": "dgx2", "role": "WORKER", "hardware": "Lenovo ThinkStation PGX" },
+    { "id": "dgx3", "name": "DGX3", "host": "dgx3", "role": "WORKER", "hardware": "Lenovo ThinkStation PGX" },
+    { "id": "dgx4", "name": "DGX4", "host": "dgx4", "role": "WORKER", "hardware": "ASUS GX10" }
+  ],
+  "links": []
+}

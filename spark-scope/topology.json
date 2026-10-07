@@ -1,0 +1,6 @@
+{
+  "nodes": [
+    {"id": "1", "name": "spark-1", "host": "local", "hardware": "DGX Spark"}
+  ],
+  "links": []
+}
