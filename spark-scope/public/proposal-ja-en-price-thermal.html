@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>提案: JA/EN UI・温度センサー履歴・API換算コスト（設計レビュー用モック）</title>
+<style>
+  :root {
+    --bg: #F4F7FB;
+    --surface: #FFFFFF;
+    --ink: #263238;
+    --blue: #3977A8;
+    --green: #2E7D67;
+    --amber: #A95C20;
+    --line: rgba(38, 50, 56, 0.14);
+    --line-soft: rgba(38, 50, 56, 0.08);
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 16px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Archivo, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Noto Sans JP", system-ui, sans-serif;
+    line-height: 1.7;
+  }
+  main, header, section { max-width: 62rem; margin: 0 auto; padding: 0 1.25rem; }
+  h1 { font-size: 1.35rem; line-height: 1.4; margin: 0 0 .25rem; font-weight: 600; }
+  h2 { font-size: 1.1rem; margin: 2.5rem 0 .5rem; font-weight: 600; border-bottom: 1px solid var(--line); padding-bottom: .3rem; }
+  h3 { font-size: 1rem; margin: 1.25rem 0 .4rem; font-weight: 600; }
+  p, li { font-size: .95rem; }
+  a { color: var(--blue); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; background: var(--bg); border: 1px solid var(--line-soft); border-radius: 3px; padding: 0 .25em; }
+  .surface {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(38, 50, 56, 0.05);
+    padding: 1rem 1.25rem;
+  }
+  .note {
+    border-left: 3px solid var(--amber);
+    background: var(--surface);
+    padding: .75rem 1rem;
+    margin: 1rem 0;
+    font-size: .9rem;
+  }
+  .mock-badge {
+    display: inline-block;
+    font-size: .75rem;
+    color: var(--amber);
+    border: 1px solid var(--amber);
+    border-radius: 999px;
+    padding: 0 .6em;
+    vertical-align: middle;
+  }
+  .decision {
+    border: 1px solid var(--blue);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+  }
+  .decision .label { color: var(--blue); font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  th, td { border: 1px solid var(--line); padding: .45rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--bg); font-weight: 600; }
+  .num { font-family: Archivo, ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+  /* ---- CSS-only JA/EN switch ---- */
+  #lang-toggle { position: absolute; opacity: 0; pointer-events: none; }
+  .lang-switch {
+    display: inline-flex; align-items: center; gap: .5rem;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    padding: .25rem .9rem;
+    font-size: .85rem;
+    user-select: none;
+  }
+  .lang-switch .knob {
+    width: 1.6rem; height: 1rem; border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    position: relative;
+  }
+  .lang-switch .knob::after {
+    content: ""; position: absolute; top: 1px; left: 1px;
+    width: .7rem; height: .7rem; border-radius: 50%;
+    background: var(--blue);
+    transition: none;
+  }
+  #lang-toggle:checked + .lang-switch .knob::after { left: calc(100% - .7rem - 1px); background: var(--green); }
+  .lang-only-ja, .lang-only-en { display: block; }
+  #lang-toggle:checked ~ * .lang-only-ja { display: none; }
+  #lang-toggle:not(:checked) ~ * .lang-only-en { display: none; }
+  .bilingual { color: var(--ink); opacity: .8; font-size: .9rem; }
+  .lang-only-en .bilingual { opacity: .85; }
+
+  /* ---- thermal strips (the one visual moment) ---- */
+  .strip-row { display: grid; gap: .75rem; }
+  .strip {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr 6.5rem 5rem;
+    gap: .75rem;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: .55rem .9rem;
+  }
+  .strip .name { font-size: .88rem; }
+  .strip .track {
+    height: .55rem;
+    border-radius: 4px;
+    background: var(--bg);
+    border: 1px solid var(--line-soft);
+    position: relative;
+  }
+  .strip .fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px 0 0 4px; }
+  .strip .max-mark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--amber); }
+  .t-cool { background: var(--green); }
+  .t-warm { background: var(--blue); }
+  .t-hot  { background: var(--amber); }
+  .strip .vals { font-size: .82rem; text-align: right; }
+  .strip .vals .max { color: var(--amber); }
+  .legend { font-size: .8rem; color: var(--ink); opacity: .75; margin-top: .5rem; }
+  .swatch { display: inline-block; width: .8em; height: .8em; border-radius: 2px; vertical-align: -1px; }
+  .gap-note { font-size: .8rem; color: var(--amber); }
+
+  @media (max-width: 600px) {
+    .strip {
+      grid-template-columns: 1fr 1fr;
+      grid-template-areas:
+        "name vals"
+        "track track";
+      row-gap: .35rem;
+      column-gap: .5rem;
+      padding: .5rem .6rem;
+    }
+    .strip .name { grid-area: name; font-size: .82rem; }
+    .strip .vals { grid-area: vals; }
+    .strip .track { grid-area: track; }
+    .strip .vals br { display: none; }
+    .strip .vals .max { display: inline-block; margin-left: .4em; }
+  }
+
+  /* ---- before/after radios ---- */
+  .ba-radios { display: flex; gap: 1.25rem; margin: .75rem 0 1rem; font-size: .9rem; }
+  .ba-radios label { cursor: pointer; }
+  #ba-current, #ba-proposed { position: absolute; opacity: 0; pointer-events: none; }
+  .ba-current, .ba-proposed { display: none; }
+  #ba-current:checked ~ main .ba-current { display: block; }
+  #ba-proposed:checked ~ main .ba-proposed { display: block; }
+  #ba-current:checked ~ main label[for="ba-current"],
+  #ba-proposed:checked ~ main label[for="ba-proposed"] {
+    color: var(--green); font-weight: 600;
+    border-bottom: 2px solid var(--green);
+  }
+  #ba-current:focus ~ main label[for="ba-current"],
+  #ba-proposed:focus ~ main label[for="ba-proposed"] {
+    outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 2px;
+  }
+  .ba-panel { border: 1px dashed var(--line); border-radius: 12px; padding: 1rem 1.25rem; margin: 1rem 0; }
+  .ba-panel.current { border-color: var(--amber); }
+  .ba-panel.proposed { border-color: var(--green); }
+  .theme-hint { font-size: .85rem; opacity: .75; }
+  .theme-dot { display: inline-block; width: .9em; height: .9em; border-radius: 50%; border: 1px solid var(--line); vertical-align: -1px; }
+  .dot-l { background: var(--surface); }
+  .dot-s { background: var(--ink); }
+  .dot-d { background: var(--blue); }
+
+  /* ---- wireframe ---- */
+  .wireframe { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 1rem; }
+  .wireframe svg { width: 100%; height: auto; display: block; }
+  .wireframe text { font-family: inherit; }
+
+  footer.site { margin: 3rem 0 2rem; font-size: .8rem; opacity: .7; }
+</style>
+</head>
+<body>
+
+<input type="checkbox" id="lang-toggle" aria-label="言語切替 / Language toggle (Japanese-first, English equivalent)">
+<input type="radio" name="ba" id="ba-current">
+<input type="radio" name="ba" id="ba-proposed" checked>
+
+<main>
+  <header>
+    <p><label class="lang-switch" for="lang-toggle">
+      <span>JA / EN</span><span class="knob" aria-hidden="true"></span>
+    </label></p>
+    <h1 class="lang-only-ja">提案書: 日本語UI・センサー別温度履歴・メーカー公式API換算コストの同時表示</h1>
+    <h1 class="lang-only-en">Proposal: Japanese-first UI, per-sensor thermal history, and official-API price equivalence — design-review mock</h1>
+    <p class="bilingual">設計レビュー用の静的モック / Static design-review artifact. このページ自体は実ダッシュボードを変更しません / This page does not modify the live dashboard.</p>
+    <p class="note lang-only-ja"><strong>注意:</strong> このページの温度・トークン数・価格内訳はすべて<strong>説明用のサンプル値（モックデータ）</strong>です。実測値・実課金ではありません。</p>
+    <p class="note lang-only-en"><strong>Note:</strong> All temperatures, token counts, and price breakdowns on this page are <strong>illustrative mock data</strong>, not live measurements or actual billing.</p>
+  </header>
+
+  <section>
+    <h2 class="lang-only-ja">1. デザイン方針（パレット・書体・レイアウト）</h2>
+    <h2 class="lang-only-en">1. Design plan (palette, type, layout)</h2>
+    <div class="surface">
+      <h3 class="lang-only-ja">パレット</h3>
+      <h3 class="lang-only-en">Palette</h3>
+      <table>
+        <tr><th scope="col">Token</th><th scope="col">Hex</th><th scope="col">Use / 用途</th></tr>
+        <tr><td>--bg</td><td class="num">#F4F7FB</td><td class="lang-only-ja">ページ背景（柔らかい明色）<span class="lang-only-en"> page background</span></td></tr>
+        <tr><td>--surface</td><td class="num">#FFFFFF</td><td class="lang-only-ja">12px角の面（細い枠線 + 控えめな影）<span class="lang-only-en"> 12px surfaces, subtle outline</span></td></tr>
+        <tr><td>--ink</td><td class="num">#263238</td><td class="lang-only-ja">本文・見出し<span class="lang-only-en"> body and headings</span></td></tr>
+        <tr><td>--blue</td><td class="num">#3977A8</td><td class="lang-only-ja">リンク・中性温帯・重点枠<span class="lang-only-en"> links, mid-band temps, emphasis</span></td></tr>
+        <tr><td>--green</td><td class="num">#2E7D67</td><td class="lang-only-ja">安全温帯・提案パネル<span class="lang-only-en"> safe band, proposed panel</span></td></tr>
+        <tr><td>--amber</td><td class="num">#A95C20</td><td class="lang-only-ja">高温帯・注記・mock印・N/A<span class="lang-only-en"> hot band, notes, mock badge, N/A</span></td></tr>
+      </table>
+      <p class="lang-only-ja">グラデーション不使用。彩度を抑えた3色帯（緑→青→琥珀）で温度を読ませます。</p>
+      <p class="lang-only-en">No gradients. A restrained three-band scale (green → blue → amber) carries temperature.</p>
+
+      <h3 class="lang-only-ja">書体</h3>
+      <h3 class="lang-only-en">Typography</h3>
+      <ul>
+        <li class="lang-only-ja">ラテン数字・単位: 既存の <code>Archivo</code>（tabular-nums を使用。本ページはフォント外部読込なし・ローカルフォールバック表示）。和文: システム日本語UIフォント（Hiragino / Yu Gothic 等）。</li>
+        <li class="lang-only-en">Latin digits and units: existing <code>Archivo</code> with <code>tabular-nums</code> (this page loads no fonts externally; local fallbacks render it). Japanese: system Japanese UI font stack.</li>
+        <li class="lang-only-ja">基準16px、本文0.95rem、行高1.7。全大文字ラベル・目立つ「eyebrow」の反復は使いません。</li>
+        <li class="lang-only-en">16px base, 0.95rem body, 1.7 line-height. No all-caps labels, no repeated eyebrows.</li>
+      </ul>
+
+      <h3 class="lang-only-ja">レイアウト</h3>
+      <h3 class="lang-only-en">Layout</h3>
+      <ul>
+        <li class="lang-only-ja">最大幅62rem、1カラム。操作系（言語切替）はヘッダー右上に1つだけ。セクション間は見出し下罫線で区切り、カードの群生は避ける。</li>
+        <li class="lang-only-en">Single column, 62rem max width. One control (language switch) top of header; sections separated by heading rules, not card grids.</li>
+        <li class="lang-only-ja">面は12px角・1px枠線・影は控えめ（0 1px 2px）。既存の light / system / dark テーマ選好はこの提案でも保持します（本モックはlight背景のみで描画）。</li>
+        <li class="lang-only-en">12px radius, 1px outline, restrained shadow. The existing light/system/dark theme preference is preserved by the proposal (this mock renders light only).</li>
+      </ul>
+    </div>
+
+    <h3 class="lang-only-ja">ジェネリック既定値への批評</h3>
+    <h3 class="lang-only-en">Critique of generic defaults</h3>
+    <ul>
+      <li class="lang-only-ja"><strong>汎用SaaSカード並べ:</strong> 同形カードの等間隔グリッドは情報の優劣を消します。本提案は「温度ストリップ列」という単一の視覚モーメントに集約し、他は罫線区切りの散文にします。</li>
+      <li class="lang-only-en"><strong>Generic SaaS cards:</strong> uniform card grids erase hierarchy. This proposal concentrates on one visual moment — a row of per-sensor thermal strips — and uses rule-separated prose elsewhere.</li>
+      <li class="lang-only-ja"><strong>グラデーション・発光:</strong> 温度は既に色の意味を持つため、装飾グラデーションは誤読の源。フラット帯 + 5分最大値の目盛線で十分です。</li>
+      <li class="lang-only-en"><strong>Gradients/glow:</strong> temperature already encodes meaning through color; decorative gradients invite misreading. Flat bands plus a 5-minute-max tick line suffice.</li>
+      <li class="lang-only-ja"><strong>全大文字ラベル・反復eyebrow:</strong> 日本語では大文字概念がなく、英語でも視覚ノイズになります。文頭の太い強調のみ。</li>
+      <li class="lang-only-en"><strong>All-caps labels / repeated eyebrows:</strong> meaningless in Japanese and noise in English; bold sentence-lead emphasis only.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2 class="lang-only-ja">2. Before / After（比較モック）</h2>
+    <h2 class="lang-only-en">2. Before / After (comparative mock)</h2>
+    <p class="bilingual"> radios / labels 静的比較。実ダッシュボードは変更しません。</p>
+    <div class="ba-radios">
+      <label for="ba-current" class="lang-only-ja">現状 (Before)</label>
+      <label for="ba-current" class="lang-only-en">Current (Before)</label>
+      <label for="ba-proposed" class="lang-only-ja">提案 (After)</label>
+      <label for="ba-proposed" class="lang-only-en">Proposed (After)</label>
+    </div>
+
+    <div class="ba-panel current">
+      <h3 class="lang-only-ja">Before — 現状（実装前）の Spark Scope <span class="mock-badge">サンプル表示 / mock</span></h3>
+      <h3 class="lang-only-en">Before — Spark Scope before this change <span class="mock-badge">mock render</span></h3>
+      <table>
+        <tr><th scope="col">Sensor (kept as-is)</th><th scope="col">Now</th></tr>
+        <tr><td class="num">ACPI TSOC</td><td class="num">41.5 °C</td></tr>
+        <tr><td class="num">ACPI TS0E</td><td class="num">44.2 °C</td></tr>
+        <tr><td class="num">ACPI TS0P</td><td class="num">43.8 °C</td></tr>
+        <tr><td class="num">ACPI TS1E</td><td class="num">46.5 °C</td></tr>
+        <tr><td class="num">ACPI TS1P</td><td class="num">45.9 °C</td></tr>
+        <tr><td class="num">TGPU</td><td class="num">52.1 °C</td></tr>
+        <tr><td class="num">TUNC</td><td class="num">48.3 °C</td></tr>
+        <tr><td class="num">NVMe</td><td class="num">38.0 °C</td></tr>
+        <tr><td class="num">NIC</td><td class="num">42.7 °C</td></tr>
+      </table>
+      <ul>
+        <li class="lang-only-ja">UIは英語のみ（aria / tooltip / エラー / 空欄文言も英語）。テーマ: light / system / dark の選好あり。</li>
+        <li class="lang-only-en">English-only UI (aria, tooltips, errors, blanks included). Theme preference: light/system/dark exists.</li>
+        <li class="lang-only-ja">ノード詳細に ACPI / NVMe / NIC センサーの現在値を表示。既存の GPU・メモリ・スループットの各チャートはそのまま残ります。</li>
+        <li class="lang-only-en">Current ACPI / NVMe / NIC sensor readings appear in node details. The existing GPU, memory, and throughput charts remain as-is.</li>
+        <li class="lang-only-ja">センサー別の温度履歴・平均・最大値は無し（現在値のみ）。価格換算表示も無し。</li>
+        <li class="lang-only-en">No per-sensor temperature history, average, or max — current readings only. No price equivalence either.</li>
+        <li class="lang-only-ja">既存の DGX Monitor（ポート 8910）は「各取得時に全 thermal_zone センサーの最大値」を 5 秒ごとに 1 サンプルとして保持し、その代表系列だけで 1/5/15 分平均と 5 分最大を出します。センサー別には何も保持しません。</li>
+        <li class="lang-only-en">The existing DGX Monitor (port 8910) keeps ONE representative sample per five-second poll — the maximum over all thermal_zone sensors — and computes the 1/5/15m means and 5m max from that representative series alone. It keeps nothing per sensor.</li>
+      </ul>
+      <p class="theme-hint"><span class="swatch dot-l"></span> light <span class="swatch dot-s"></span> system <span class="swatch dot-d"></span> dark — <span class="lang-only-ja">既存テーマ選好</span><span class="lang-only-en"> existing preference</span></p>
+    </div>
+
+    <div class="ba-panel proposed">
+      <h3 class="lang-only-ja">After — 実装した内容（このワーキングツリー） <span class="mock-badge">数値はサンプル / sample values only</span></h3>
+      <h3 class="lang-only-en">After — what was implemented in this working tree <span class="mock-badge">sample values only</span></h3>
+      <ul>
+        <li class="lang-only-ja">常設の JA/EN 切替を実装（localStorage 保存 + ブラウザ言語の初回検出、テーマ選好とは別キーなので切替で壊れない）。ラベル・aria属性・tooltip・エラー・空欄を両言語化。</li>
+        <li class="lang-only-en">Persistent JA/EN switch implemented (saved in localStorage, first-time browser-language detection; a separate storage key from the theme, so switching never breaks the theme). Labels, aria attributes, tooltips, errors, and blank states localized.</li>
+        <li class="lang-only-ja">テーマ切替（light/system/dark）は維持。既定の light テーマを提案の柔らかい明色方向に更新（dark は既存値のまま）。</li>
+        <li class="lang-only-en">Theme toggle (light/system/dark) preserved. The default light theme now follows the proposal's soft-light direction (dark keeps its existing values).</li>
+        <li class="lang-only-ja">既存の 6 時間 volatile 履歴に、5 秒の実収集サンプルごとに「ACPI ゾーン別 + NVMe + NIC」の個別系列と「ゾーン最大値」の代表系列を記録（永続化なし・新コレクタなし・既存 5 秒 SSH 取得を再利用）。</li>
+        <li class="lang-only-en">The existing 6h volatile history now records, per actual five-second collected sample, individual series for each ACPI zone plus NVMe and NIC, and the max-over-zones representative series (no persistence, no new collector — the existing five-second SSH collection is reused).</li>
+        <li class="lang-only-ja">代表系列には 8910 と同じ正規統計（包括 1/5/15 分の算術平均・小数1桁、5 分最大）をサーバー側の全解像度履歴から計算し /api/state で公開。ダウンサンプル後の値は統計に使わない。</li>
+        <li class="lang-only-en">The representative series gets the canonical 8910 statistics (inclusive 1/5/15m arithmetic means to one decimal, 5m max), computed server-side from the full-resolution history and exposed in /api/state. Downsampled values are never used for the statistics.</li>
+        <li class="lang-only-ja">UIは各センサーの現在値 + 1/5/15 分平均 + 5 分最大を表示。ウォームアップ中はサンプル数を、サンプル無しは「no sample / サンプルなし」を示す（ゼロとは表示しない）。代表統計は全 ACPI 温度ゾーン（TGPU の ACPI ゾーンがあればそれも含む）の最大値で、別系統の nvidia-smi GPU 温度および NVMe・NIC の個別センサー値は代表統計に含めない。</li>
+        <li class="lang-only-en">The UI shows each sensor's current value + 1/5/15m means + 5m max; while history fills it shows the sample count, and with no samples it reads "no sample" — never a zero. The representative statistic is the maximum across all ACPI thermal zones (including the ACPI TGPU zone when present); the separate nvidia-smi GPU temperature and the separate NVMe/NIC sensor readings are not part of it.</li>
+      </ul>
+
+      <h3 class="lang-only-ja">センサー別サーマルストリップ（本提案の中心モーメント）</h3>
+      <h3 class="lang-only-en">Per-sensor thermal strips (the proposal's central moment)</h3>
+      <div class="strip-row" role="img" aria-label="センサー別温度ストリップのサンプル図 / illustrative per-sensor thermal strips">
+        <div class="strip"><span class="name num">ACPI TSOC</span><span class="track"><span class="fill t-cool" style="width:34%"></span><span class="max-mark" style="left:41%"></span></span><span class="vals num">1m avg 41.5&nbsp;°C<br><span class="max">5m max 43.2&nbsp;°C</span></span></div>
+        <div class="strip"><span class="name num">ACPI TS0E</span><span class="track"><span class="fill t-cool" style="width:37%"></span><span class="max-mark" style="left:45%"></span></span><span class="vals num">1m avg 44.2&nbsp;°C<br><span class="max">5m max 46.0&nbsp;°C</span></span></div>
+        <div class="strip"><span class="name num">ACPI TS0P</span><span class="track"><span class="fill t-warm" style="width:40%"></span><span class="max-mark" style="left:47%"></span></span><span class="vals num">1m avg 45.8&nbsp;°C<br><span class="max">47.5&nbsp;°C</span></span></div>
+        <div class="strip"><span class="name num">ACPI TS1E</span><span class="track"><span class="fill t-warm" style="width:42%"></span><span class="max-mark" style="left:50%"></span></span><span class="vals num">1m avg 46.9&nbsp;°C<br><span class="max">49.1&nbsp;°C</span></span></div>
+        <div class="strip"><span class="name num">ACPI TS1P</span><span class="track"><span class="fill t-warm" style="width:41%"></span><span class="max-mark" style="left:48%"></span></span><span class="vals num">1m avg 46.2&nbsp;°C<br><span class="max">48.4&nbsp;°C</span></span></div>
+        <div class="strip"><span class="name num">TGPU</span><span class="track"><span class="fill t-hot" style="width:58%"></span><span class="max-mark" style="left:66%"></span></span><span class="vals num">1m avg 57.4&nbsp;°C<br><span class="max">61.8&nbsp;°C</span></span></div>
+        <div class="strip"><span class="name num">TUNC</span><span class="track"><span class="fill t-warm" style="width:46%"></span><span class="max-mark" style="left:52%"></span></span><span class="vals num">1m avg 49.0&nbsp;°C<br><span class="max">51.2&nbsp;°C</span></span></div>
+        <div class="strip"><span class="name num">NVMe</span><span class="track"><span class="fill t-cool" style="width:31%"></span><span class="max-mark" style="left:38%"></span></span><span class="vals num">1m avg 38.0&nbsp;°C<br><span class="max">39.5&nbsp;°C</span></span></div>
+        <div class="strip"><span class="name num">NIC</span><span class="track"><span class="fill t-warm" style="width:36%"></span><span class="max-mark" style="left:44%"></span></span><span class="vals num">1m avg 42.7&nbsp;°C<br><span class="max">45.0&nbsp;°C</span></span></div>
+      </div>
+      <p class="legend"><span class="swatch t-cool"></span> ~45&nbsp;°C未満 / below <span class="swatch t-warm"></span> 45–55 <span class="swatch t-hot"></span> 55以上 / and above — <span class="lang-only-ja">縦線=直近5分の最大値</span><span class="lang-only-en"> vertical mark = rolling 5-minute max</span> <span class="mock-badge">サンプル値 / mock values</span></p>
+      <p class="gap-note lang-only-ja">取得漏れのサンプルは線を欠落させます（例: TS1E の 12:04–12:05 は空白）。再起動直後は「収集・ウォームアップ中（最大5分）」と表示。</p>
+      <p class="gap-note lang-only-en">Missing samples render as line gaps (e.g., TS1E 12:04–12:05 blank). Right after restart the UI states "collecting / warming up (up to 5 minutes)".</p>
+
+      <h3 class="lang-only-ja">履歴チャート（任意・既存ウィンドウ準拠）</h3>
+      <h3 class="lang-only-en">History chart (optional, existing windows)</h3>
+      <ul>
+        <li class="lang-only-ja">既存 Spark Scope の 15m / 1h / 6h ウィンドウ設定にそのまま従います。</li>
+        <li class="lang-only-en">Follows the existing Spark Scope 15m / 1h / 6h window options.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="decision">
+    <h2 class="lang-only-ja" style="margin-top:0">3. 採用した契約: 実際の 8910 の温度セマンティクス</h2>
+    <h2 class="lang-only-en" style="margin-top:0">3. Adopted contract: the actual 8910 thermal semantics</h2>
+    <p class="lang-only-ja"><span class="label">確認済み:</span> 現在の gb10-monitor（ポート 8910, server.js）では、5 秒ごとのホスト取得でオンラインかつ温度が取れたときに<strong>全 thermal_zone センサーの最大値</strong>（TGPU の ACPI ゾーンが存在すればそれも含む）を 1 サンプルとして追加し、<strong>その最大値ごとの時系列だけ</strong>を使って、包括的な直近 1/5/15 分の算術平均（小数1桁丸め）と 5 分最大（小数1桁）を出します。欠落・オフラインはサンプルを作らず、履歴は RAM のみ・15 分保持です。実装はこの契約を代表系列にそのまま適用し、さらにゾーン別・NVMe・NIC の個別系列を同じ 6 時間 volatile 履歴に追加しました。別系統の nvidia-smi GPU 温度、および NVMe・NIC の個別センサー値は代表統計に含みません。</p>
+    <p class="lang-only-en"><span class="label">Verified:</span> in the current gb10-monitor (port 8910, server.js), every five-second host poll that is online and has a reading adds ONE representative sample — the maximum over all thermal_zone sensors (including the ACPI TGPU zone when present) — and uses that same max-per-sample time series for the inclusive last-1m/5m/15m arithmetic means (one decimal) and the 5m maximum (one decimal). Missing or offline produces no sample; history is RAM-only, 15m retained. The implementation applies this contract verbatim to the representative series and additionally records per-zone, NVMe and NIC series in the same 6h volatile history. The separate nvidia-smi GPU temperature and the separate NVMe/NIC sensor readings are not part of the representative statistics.</p>
+  </section>
+
+  <section>
+    <h2 class="lang-only-ja">4. コスト: メーカー公式API換算・現在単価 / Official API equivalent at current rates</h2>
+    <h2 class="lang-only-en">4. Cost: メーカー公式API換算・現在単価 / Official API equivalent at current rates</h2>
+    <div class="note lang-only-ja">以下の数値はすべて<strong>説明用サンプル</strong>です。単価は 2026-10-03 JST 時点で確認した Z.AI GLM-5.3-Flash の公式公開 API 単価（出典: z.ai/pricing、本文参照）。換算は参考計算であり、実際の請求・節約額ではありません。実装では単価メタデータはローカル静的のみで、自動取得・新依存はありません。</div>
+    <div class="note lang-only-en">All figures below are <strong>illustrative samples</strong>. Rates are the official public Z.AI GLM-5.3-Flash API prices, checked 2026-10-03 JST (source: z.ai/pricing, cited as text). This is a reference calculation, not an actual bill or savings. In the implementation the rate metadata is static and local only — no automatic fetch, no new dependency.</div>
+
+    <div class="surface">
+      <h3 class="lang-only-ja">実装した単価（公式・2026-10-03確認・静的ローカル）</h3>
+      <h3 class="lang-only-en">Implemented rates (official, checked 2026-10-03, static local)</h3>
+      <table>
+        <tr><th scope="col">Component / 構成要素</th><th scope="col">Rate / 単価</th></tr>
+        <tr><td class="lang-only-ja">未キャッシュ入力<span class="lang-only-en"> uncached input</span></td><td class="num">$0.15 / 1M tok</td></tr>
+        <tr><td class="lang-only-ja">キャッシュ入力<span class="lang-only-en"> cached input</span></td><td class="num">$0.03 / 1M tok</td></tr>
+        <tr><td class="lang-only-ja">出力<span class="lang-only-en"> output</span></td><td class="num">$0.50 / 1M tok</td></tr>
+      </table>
+      <p class="lang-only-ja">ローカルの <code>GLM-5.3-Flash-FP8</code> のみを Z.AI <code>GLM-5.3-Flash</code> に明示対応付け。未知モデル・未検証単価・ゼロ価格・未報告カウンターは<strong>N/A（無料ではない）</strong>。必要な構成要素が揃わない場合、出力だけでの推定はしない（合計も N/A）。表示は USD・確認日付き。</p>
+      <p class="lang-only-en">Only local <code>GLM-5.3-Flash-FP8</code> is explicitly mapped to Z.AI <code>GLM-5.3-Flash</code>. Unknown models, unverified or zero prices, and unreported counters read as <strong>N/A (not free)</strong>. When a required component is unavailable, output is never estimated alone — the total is N/A too. USD only, with the checked date shown.</p>
+
+      <h3 class="lang-only-ja">内訳サンプル（1M + 1M 出力）</h3>
+      <h3 class="lang-only-en">Sample breakdown (1M + 1M output)</h3>
+      <table>
+        <tr><th scope="col">Component</th><th scope="col">Tokens <span class="mock-badge">mock</span></th><th scope="col">Cost</th></tr>
+        <tr><td>Uncached input</td><td class="num">1,000,000</td><td class="num">$0.15</td></tr>
+        <tr><td>Cached input</td><td class="num">0</td><td class="num">$0.00</td></tr>
+        <tr><td>Output</td><td class="num">1,000,000</td><td class="num">$0.50</td></tr>
+        <tr><th scope="row">Total</th><td class="num">2,000,000</td><td class="num"><strong>$0.65</strong></td></tr>
+      </table>
+      <p class="num lang-only-ja">式: （未キャッシュ入力 × $0.15 + キャッシュ入力 × $0.03 + 出力 × $0.50）÷ 1,000,000 = USD。上記の確認済み引用単価を使用。各成分を一度だけ計上（二重計上なし）。未知モデル・未知成分は N/A。</p>
+      <p class="num lang-only-en">Formula: (uncached_input × $0.15 + cached_input × $0.03 + output × $0.50) / 1,000,000 = USD, using the cited checked rates above. Each component counted once (never double counted). Unknown models / unknown components are N/A.</p>
+      <p class="lang-only-ja"><strong>明示的な制限:</strong> ローカル台帳はエンジン生成トークンカウンタを記録しますが、推論（reasoning）トークン専用のカウンタは持っていません。隠れた推論トークンの価格への実際の算入有無・等価性はまだ独立に検証されていません。したがって金額は<strong>目安的な参考値</strong>として扱い、請求書と正確に一致するものとみなさないでください。推論トークンが除外されている、または含まれているとは主張しません。</p>
+      <p class="lang-only-en"><strong>Explicit limitation:</strong> the local ledger records the engine generation token counter and has <strong>no separate reasoning-token counter</strong>. Exact inclusion of, and price equivalence for, hidden reasoning tokens has not yet been independently verified. Treat the amount as an <strong>indicative reference</strong>, not exact invoice equivalence. No claim is made that reasoning is excluded or included.</p>
+    </div>
+
+    <ul>
+      <li class="lang-only-ja">実装: <code>UsageStore.month()</code> にスキーマ変更なしでモデル別グループ合計を追加。全期間は既存の上位 10 モデル（<code>usage.models</code>）を使用し、UI にその制限を明記。ベースライン／再起動／タイムゾーンの既存セマンティクスはそのまま。</li>
+      <li class="lang-only-en">Implemented: <code>UsageStore.month()</code> now includes per-model group totals without a schema change. All time uses the existing top-10 per-model list (<code>usage.models</code>) with the limitation stated in the UI. Baseline/restart/time-zone semantics are untouched.</li>
+      <li class="lang-only-ja">価格表示は台帳の<strong>実際に報告された</strong>カウンターのみを使い、未報告カウンターをゼロとして価格計算しない。推論（reasoning）トークン専用カウンターは無いため、算入有無について何も主張しない。</li>
+      <li class="lang-only-en">The price view prices only the ledger's <strong>actually reported</strong> counters and never treats an unreported counter as zero. There is no separate reasoning-token counter, so nothing is claimed about its inclusion.</li>
+      <li class="lang-only-ja">生トークンは端末外に出しません。価格メタデータはローカル静的のみ（自動取得なし）。実際の請求・節約・品質の等価性は主張しない。</li>
+      <li class="lang-only-en">No raw tokens leave the host; the rate metadata is static and local (nothing fetched). No actual bill, savings, or model-quality equivalence is claimed.</li>
+    </ul>
+
+    <h3 class="lang-only-ja">欠落価格モデルの扱い</h3>
+    <h3 class="lang-only-en">Missing-priced model</h3>
+    <table>
+      <tr><th scope="col">Model <span class="mock-badge">mock row</span></th><th scope="col">Equivalent cost</th></tr>
+      <tr><td class="num">GLM-5.3-Flash-FP8</td><td class="num">$0.65 <span class="lang-only-ja">（上記サンプル換算）</span><span class="lang-only-en">(sample above)</span></td></tr>
+      <tr><td class="num">unpriced-model-x</td><td class="num" style="color: var(--amber)">N/A</td></tr>
+    </table>
+
+    <h3 class="lang-only-ja">出典・鮮度メタデータ</h3>
+    <h3 class="lang-only-en">Sources &amp; freshness metadata</h3>
+    <ul>
+      <li>Z.AI Pricing — z.ai/pricing（本文参照・このページからはリンクしません / cited as text, not linked from this page)</li>
+      <li>models.dev — github.com/anomalyco/models.dev（カタログ候補・任意 / optional candidate catalog)</li>
+      <li class="lang-only-ja">価格確認: 2026-10-03 JST。プロバイダ: Z.AI。UIには「価格が古い可能性がある」警告を常に表示します。</li>
+      <li class="lang-only-en">Prices reviewed 2026-10-03 from the provider's official public rate sheet. Provider: Z.AI. The UI always shows a may-be-stale caveat.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2 class="lang-only-ja">5. 実装したファイル一覧（このワーキングツリー）</h2>
+    <h2 class="lang-only-en">5. Files implemented in this working tree</h2>
+    <div class="surface">
+      <ul>
+        <li><code>spark-scope/lib/history.mjs</code> — <span class="lang-only-ja">5 秒ノードサンプルごとの代表（ゾーン最大）+ センサー別系列のダウンサンプル、正規統計（1/5/15 分包括平均・5 分最大・サンプル数）</span><span class="lang-only-en"> downsampling of the representative max-over-zones series and per-sensor series of the five-second node samples; canonical stats (inclusive 1/5/15m means, 5m max, sample count)</span></li>
+        <li><code>spark-scope/server.mjs</code> — <span class="lang-only-ja">履歴点へ thermal/sensors を追加、/api/state に正規統計を公開（既存の 5 秒 SSH 取収集と 2 秒 API 取得はそのまま）</span><span class="lang-only-en"> thermal/sensors fields added to history points; canonical stats exposed in /api/state (the existing 5s SSH collection and 2s API poll are unchanged)</span></li>
+        <li><code>spark-scope/lib/usage-store.mjs</code> — <span class="lang-only-ja">month() にモデル別グループ合計を追加（スキーマ変更なし）</span><span class="lang-only-en"> month() gains per-model group totals (no schema change)</span></li>
+        <li><code>spark-scope/public/view-data.js</code> — <span class="lang-only-ja">静的な価格メタデータと換算計算（N/A 規則・二重計上なし・URL は同梱しない）</span><span class="lang-only-en"> static price metadata and the equivalence calculation (N/A rules, no double counting, no remote URL shipped)</span></li>
+        <li><code>spark-scope/public/i18n.js</code> — <span class="lang-only-ja">EN/JA 辞書、初回はブラウザ言語検出、保存は localStorage（テーマと別キー）</span><span class="lang-only-en"> EN/JA dictionary, first-visit browser-language detection, preference saved in localStorage (separate key from the theme)</span></li>
+        <li><code>spark-scope/public/app.js</code> / <code>index.html</code> / <code>styles.css</code> — <span class="lang-only-ja">言語切替 UI、温度センサー行、価格パネル、柔らかい明色テーマ（dark は維持）</span><span class="lang-only-en"> language switch UI, per-sensor thermal rows, the price panel, and the soft light theme (dark preserved)</span></li>
+      </ul>
+      <p class="lang-only-ja">本ページは提案・比較用の静的モックです。実ダッシュボードの値はここに表示されず、このページの数値はすべてサンプルです。</p>
+      <p class="lang-only-en">This page remains a static proposal/comparison mock. No live dashboard values appear here; every number on this page is a sample.</p>
+    </div>
+
+    <h2 class="lang-only-ja">6. ワイヤーフレーム</h2>
+    <h2 class="lang-only-en">6. Wireframe</h2>
+    <div class="wireframe">
+      <svg viewBox="0 0 640 380" role="img" aria-label="提案画面のワイヤーフレーム / proposed screen wireframe">
+        <rect x="8" y="8" width="624" height="364" rx="12" fill="#FFFFFF" stroke="#263238" stroke-opacity="0.14"/>
+        <rect x="24" y="24" width="90" height="20" rx="10" fill="none" stroke="#3977A8"/>
+        <text x="34" y="38" font-size="11" fill="#263238">JA / EN</text>
+        <text x="130" y="38" font-size="12" fill="#263238" font-weight="600">DGX 制御室 / control room</text>
+        <text x="24" y="70" font-size="12" fill="#263238">サーマル / Thermal</text>
+        <!-- strips -->
+        <g font-size="10" fill="#263238">
+          <rect x="24" y="80" width="592" height="22" rx="8" fill="none" stroke="#263238" stroke-opacity="0.14"/><text x="32" y="94">ACPI TSOC</text><rect x="140" y="88" width="380" height="6" rx="3" fill="#2E7D67"/><rect x="540" y="86" width="60" height="12" rx="3" fill="none" stroke="#263238" stroke-opacity="0.14"/><text x="544" y="95">41.5 / 43.2</text>
+          <rect x="24" y="106" width="592" height="22" rx="8" fill="none" stroke="#263238" stroke-opacity="0.14"/><text x="32" y="120">ACPI TS0E</text><rect x="140" y="114" width="380" height="6" rx="3" fill="#2E7D67"/><rect x="540" y="112" width="60" height="12" rx="3" fill="none" stroke="#263238" stroke-opacity="0.14"/><text x="544" y="121">44.2 / 46.0</text>
+          <rect x="24" y="132" width="592" height="22" rx="8" fill="none" stroke="#263238" stroke-opacity="0.14"/><text x="32" y="146">TGPU</text><rect x="140" y="140" width="220" height="6" rx="3" fill="#A95C20"/><rect x="540" y="138" width="60" height="12" rx="3" fill="none" stroke="#263238" stroke-opacity="0.14"/><text x="544" y="147">57.4 / 61.8</text>
+          <rect x="24" y="158" width="592" height="22" rx="8" fill="none" stroke="#263238" stroke-opacity="0.14"/><text x="32" y="172">NVMe</text><rect x="140" y="166" width="320" height="6" rx="3" fill="#2E7D67"/><rect x="540" y="164" width="60" height="12" rx="3" fill="none" stroke="#263238" stroke-opacity="0.14"/><text x="544" y="173">38.0 / 39.5</text>
+          <rect x="24" y="184" width="592" height="22" rx="8" fill="none" stroke="#263238" stroke-opacity="0.14"/><text x="32" y="198">NIC</text><rect x="140" y="192" width="330" height="6" rx="3" fill="#3977A8"/><rect x="540" y="190" width="60" height="12" rx="3" fill="none" stroke="#263238" stroke-opacity="0.14"/><text x="544" y="199">42.7 / 45.0</text>
+        </g>
+        <text x="24" y="228" font-size="11" fill="#A95C20">▲ 5m max マーク / 5m max mark</text>
+        <!-- history windows -->
+        <g font-size="10" fill="#263238">
+          <rect x="24" y="244" width="44" height="18" rx="9" fill="none" stroke="#3977A8"/><text x="34" y="256">15m</text>
+          <rect x="74" y="244" width="44" height="18" rx="9" fill="#3977A8"/><text x="86" y="256" fill="#FFFFFF">1h</text>
+          <rect x="124" y="244" width="44" height="18" rx="9" fill="none" stroke="#3977A8"/><text x="134" y="256">6h</text>
+          <rect x="24" y="270" width="592" height="60" rx="8" fill="#F4F7FB" stroke="#263238" stroke-opacity="0.14"/>
+          <text x="34" y="290">履歴チャート（任意） — 欠落は線の切れ目 / history chart (optional) — gaps for missing samples</text>
+        </g>
+        <!-- cost box -->
+        <g font-size="10" fill="#263238">
+          <rect x="24" y="342" width="592" height="24" rx="8" fill="none" stroke="#2E7D67"/>
+          <text x="34" y="358">メーカー/Official API 換算: GLM-5.3-Flash-FP8 → GLM-5.3-Flash — sample $0.65 (mock) — unpriced-model-x: N/A</text>
+        </g>
+      </svg>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="lang-only-ja">7. 実機検証（要約）</h2>
+    <h2 class="lang-only-en">7. Live verification (summary)</h2>
+    <div class="surface">
+      <p class="lang-only-ja"><strong>リンク（Tailnet 専用・外部公開なし）:</strong></p>
+      <p class="lang-only-en"><strong>Links (Tailnet-only, not publicly exposed):</strong></p>
+      <ul>
+        <li>ダッシュボード / Dashboard: <a href="/">/</a></li>
+        <li>提案ページ / Proposal page: <a href="/proposal-ja-en-price-thermal.html">/proposal-ja-en-price-thermal.html</a></li>
+      </ul>
+      <p class="lang-only-ja"><strong>スクリーンショット:</strong> 以下の 2 枚のみ（<code>review/dashboard-en.png</code>・<code>review/dashboard-mobile-ja.png</code>）。トークン台帳のキャプチャは実使用量合計が写るため公開しません。取得時刻はファイル一覧からの概算（タイムゾーン未特定）のため<strong>概略の実機キャプチャ</strong>として扱ってください。ダッシュボード画像のみ <code>public/review</code> へコピーして埋め込んでおり、トークン台帳の画像はコピーしていません。</p>
+      <p class="lang-only-en"><strong>Screenshots:</strong> the two figures below only (<code>review/dashboard-en.png</code> and <code>review/dashboard-mobile-ja.png</code>; ledger captures show production usage totals and are not exposed). Capture times are approximate from the file listing (timezone unspecified), so treat them as <strong>approximate live captures</strong>. Only the dashboard images were copied into <code>public/review</code> and embedded here; the token-ledger images were not copied.</p>
+      <figure style="margin:1rem 0">
+        <img src="review/dashboard-en.png" alt="Desktop dashboard (English): status cards, inference node cards, throughput chart, and temperature and memory charts. Token ledger is hidden." style="max-width:100%;height:auto;border:1px solid #cfd8dc;border-radius:8px" loading="lazy">
+        <figcaption style="font-size:.85rem;color:#546e7a;margin-top:.4rem"><span class="lang-only-ja">デスクトップ版ダッシュボード（英語）— 2026-10-03 04:10 頃のシステムローカル時刻にキャプチャ（概算・タイムゾーン未記録）。モバイル価格表の修正後に再取得した画像です。トークン台帳は非表示です。</span><span class="lang-only-en">Desktop dashboard (English) — captured Oct 3 2026 around 04:10 system-local time (approximate; timezone not recorded). Recaptured after the mobile price table fix. Token ledger is hidden.</span></figcaption>
+      </figure>
+      <figure style="margin:1rem 0">
+        <img src="review/dashboard-mobile-ja.png" alt="Mobile dashboard (Japanese) at 390px viewport: compact status cards and stacked layout. Token ledger is hidden." style="max-width:100%;max-height:520px;width:auto;height:auto;border:1px solid #cfd8dc;border-radius:8px" loading="lazy">
+        <figcaption style="font-size:.85rem;color:#546e7a;margin-top:.4rem"><span class="lang-only-ja">モバイル版ダッシュボード（日本語・390px ビューポート）— 2026-10-03 04:10 頃のシステムローカル時刻にキャプチャ（概算・タイムゾーン未記録）。モバイル価格表の修正後に再取得した画像です。ダッシュボードタブを写したもので TOKENS 表自体は写っていません。トークン台帳は非表示です。</span><span class="lang-only-en">Mobile dashboard (Japanese, 390px viewport) — captured Oct 3 2026 around 04:10 system-local time (approximate; timezone not recorded). Recaptured after the mobile price table fix. This shows the dashboard tab, not the TOKENS table itself. Token ledger is hidden.</span></figcaption>
+      </figure>
+      <p class="lang-only-ja"><strong>モバイル 390px の修正後再確認:</strong> 修正後に再計測しました — document/body の scrollWidth は 390px、価格表は 447px で横スクローラー内に収まります。上記のスクリーンショットはいずれも修正後に再取得した現行の画像です。</p>
+      <p class="lang-only-en"><strong>Mobile 390px rechecked after fix:</strong> re-measured after the fix — document/body scrollWidth is 390px and the 447px-wide price table stays inside its horizontal scroller. Both screenshots above are current captures retaken after the fix.</p>
+      <p class="lang-only-ja"><strong>Playwright 検証（合格）:</strong> JA/EN 切替・言語選好の保存・system/light/dark テーマ・tooltip・オフライン時のエラー表示・温度の no-sample・空月台帳。ページエラー・外部リクエストなし。実機 API は 200、推論ノード 4 基すべて true。状態は「degraded」— 既存の失敗サービス 1 つによるもので、今回の変更とは無関係。温度履歴は volatile で、再起動後はウォームアップ（再収集）から始まります。</p>
+      <p class="lang-only-en"><strong>Playwright checks (passing):</strong> JA/EN switch, language preference persistence, system/light/dark themes, tooltips, offline error display, thermal no-sample state, and the empty-month ledger. No page errors or external requests. Live API returned 200 with all 4 inference nodes true; status shows degraded from one preexisting failed service, unrelated to this change. Thermal history is volatile and warms up (recollection) after a restart.</p>
+      <p class="lang-only-ja"><strong>既知の限界:</strong> Playwright と実機ブラウザはサンプル取得タイミングが独立しており、同一時点の値を比較できません。価格マッピングは静的なローカルデータ（z.ai/pricing 参照）で、確認日・時刻は本ページに記録がなく、models.dev の取得は行っていません。推論（reasoning）トークンの算入有無は不明のまま主張しません。台帳のベースラインはそれ以前の使用量を含まず、価格は参考値であり請求書ではありません。</p>
+      <p class="lang-only-en"><strong>Known limits:</strong> Playwright and the live browser sample independently, so values are not comparable at the same instant. The price mapping is static local data (cited from z.ai/pricing); the exact check date/time is not recorded here and no models.dev fetch is made. Reasoning-token inclusion remains unknown and is not claimed. The ledger baseline excludes pre-ledger usage, and prices are indicative references, not invoices.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="lang-only-ja">8. ユーザー指摘の修正: 価格パネルのモバイル表示（2秒毎の全再構築を廃止）</h2>
+    <h2 class="lang-only-en">8. User-requested correction: mobile rendering of the price panel (the every-2s full rebuild is gone)</h2>
+    <div class="surface">
+      <p class="lang-only-ja"><strong>ご指摘（修正前）:</strong> 旧実装では2秒ごとのポーリングで価格表全体を毎回再構築（innerHTML 再構築）していたため、横スクローラーの位置が毎回先頭に戻り、モデル名を横へ読む操作が繰り返し失敗していました。</p>
+      <p class="lang-only-en"><strong>The user's report (before):</strong> the old implementation rebuilt the whole price table (innerHTML rebuild) on every two-second poll, so the horizontal scroller reset to the start each time and reading model names sideways kept failing.</p>
+      <p class="lang-only-ja"><strong>修正後:</strong> 各モデルは<strong>縦組みの定義カード</strong>（1モデル1カード・1カードに4行: 未キャッシュ入力・キャッシュ入力・出力・合計）として表示します。カードにはトークン数と対応する米ドル換算コスト、レート（100万トークンあたり）を示し、月別（選択月）と全期間の両方のセクションがあります。出典（z.ai/pricing、確認日）と「価格が古い可能性がある」注意書きは従来どおり読める位置に残ります。カードはモデル名でキー管理され、ポーリング間で再利用され、変更されたテキストだけをその場で差し替えるため、<strong>横スクローラーは存在しません</strong>（縦スクロールだけで読めます）。カードは2秒経っても動かないため、読んでいる位置とフォーカスは維持されます。</p>
+      <p class="lang-only-en"><strong>After:</strong> each model is now a <strong>vertical definition card</strong> (one card per model, four lines per card: uncached input, cached input, output, total). Cards show token counts, the equivalent USD cost, and the rate (per 1M tokens), in both the selected-month and all-time sections. The source (z.ai/pricing with its checked date) and the may-be-stale caution remain readable where they were. Cards are keyed by model name, reused across polls, and only changed text is patched in place — <strong>there is no horizontal scroller</strong> (everything reads by vertical scroll alone). Because cards do not move on the two-second tick, the reader's position and focus are preserved.</p>
+      <p class="lang-only-ja"><strong>自動更新は継続:</strong> 年間を通じたアプリ側の自動更新（2秒ポーリング）は無効化していません。データは2秒ごとに更新され続けますが、カードはキー管理でその場で差し替えられるため画面は揺れません。</p>
+      <p class="lang-only-en"><strong>Auto-refresh stays on:</strong> the app's automatic refresh (two-second polling) was not disabled. Data keeps updating every two seconds; only the patching is now in place per keyed card, so the page does not jump.</p>
+      <p class="lang-only-ja"><strong>デスクトップ表示の調整:</strong> 1440px 幅の実機確認でカードが横へ約1348pxまで伸び、ラベルと数値が離れすぎるという指摘を受けました。カードグリッドの最大幅を920pxに制限し、カード最小幅を約360pxにしたため、デスクトップでは1枚あたり約450pxの読みやすい幅になり、モバイル（320/390px）では従来どおり全幅1枚で表示されます。価格・ロジックの変更はありません。</p>
+      <p class="lang-only-en"><strong>Desktop adjustment:</strong> a 1440px-wide live check showed a single card stretching to about 1348px, pushing labels and values too far apart. The card grid is now capped at 920px with a minimum card width of about 360px, so desktop cards land around 450px wide and readable, while mobile (320/390px) still shows one full-width card as before. Prices and logic are unchanged.</p>
+      <p class="lang-only-ja"><strong>検証の証拠（今回の計測事実のみ）:</strong> <code>npm test</code> は 139/139 合格しました。稼働中の Tailnet 専用 :8914 アプリを再確認した結果、320/390/430px の電話幅（JA・EN）で document/body の幅はビューポートと一致し横あふれはありませんでした。1024/1440px のデスクトップでは各グリッドに 455px 幅のカードが2枚表示されました。390x640 では出典注記が縦スクロールで到達可能（JA で scrollY 1380）で、6.5秒の自動ポーリング後もスクロール位置は 1380 のまま、フォーカス中の言語切替はフォーカスを保持し、同じカードの DOM ノードが残り、updated-at は進んでいました。これらの確認はすべて、app.js と styles.css の SHA-256 がローカルソースと一致し、アセットが <code>Cache-Control: no-cache</code> を返す、現在配信中の :8914 アプリに対して行いました。これ以外のテストや実機スクリーンショットについては主張しません。</p>
+      <p class="lang-only-en"><strong>Evidence (only the facts measured this time):</strong> <code>npm test</code> passed 139/139. A recheck of the running Tailnet-only :8914 app at 320/390/430 phone widths in JA and EN showed document/body width equal to the viewport with no horizontal overflow. At 1024/1440 desktop widths each grid showed two cards, 455px each. At 390x640 the source note was reachable by vertical scrolling (scrollY 1380 in JA), and after 6.5 seconds of automatic polling the scroll position stayed 1380, the focused language-toggle stayed focused, the same card DOM node remained, and updated-at advanced. All checks were against the currently served :8914 app, whose app.js and styles.css SHA-256 matched the local source and whose assets return <code>Cache-Control: no-cache</code>. No tests or live screenshots beyond these facts are claimed.</p>
+      <p class="lang-only-ja"><strong>下のスクリーンショットについて:</strong> 以下の2枚は稼働中の :8914 価格パネルの<strong>実機キャプチャ</strong>（2026-10-03 04:51 頃のシステムローカル時刻、概算・タイムゾーン未記録）で、ローカル台帳から派生した<strong>実使用量の件数と推定ドル合計が写っています</strong>。配信は既存の Tailnet 専用 :8914 提案ページ経由のみ（外部公開なし）。モックやマスキング画像ではありません。</p>
+      <p class="lang-only-en"><strong>About the screenshots below:</strong> the two figures are <strong>live captures</strong> of the running :8914 price panel (around Oct 3 2026 04:51 system-local time, approximate; timezone not recorded) and <strong>contain live ledger-derived per-model counts and estimated dollar totals</strong>. They are served only by the existing Tailnet-only :8914 proposal page (not publicly exposed). They are not mock or scrubbed images.</p>
+      <figure style="margin:1rem 0">
+        <img src="review/price-en-390.png" alt="Mobile price panel (English) at 390px viewport: vertical per-model cards with token counts, USD equivalents, and totals." style="max-width:100%;height:auto;border:1px solid #cfd8dc;border-radius:8px" loading="lazy">
+        <figcaption style="font-size:.85rem;color:#546e7a;margin-top:.4rem"><span class="lang-only-ja">価格パネル（英語・390px ビューポート）。実台帳由来の値を含みます。Tailnet 専用配信。</span><span class="lang-only-en">Price panel (English, 390px viewport). Contains live ledger-derived values. Tailnet-only.</span></figcaption>
+      </figure>
+      <figure style="margin:1rem 0">
+        <img src="review/price-ja-390.png" alt="Mobile price panel (Japanese) at 390px viewport: vertical per-model cards with token counts, USD equivalents, and totals." style="max-width:100%;height:auto;border:1px solid #cfd8dc;border-radius:8px" loading="lazy">
+        <figcaption style="font-size:.85rem;color:#546e7a;margin-top:.4rem"><span class="lang-only-ja">価格パネル（日本語・390px ビューポート）。実台帳由来の値を含みます。Tailnet 専用配信。</span><span class="lang-only-en">Price panel (Japanese, 390px viewport). Contains live ledger-derived values. Tailnet-only.</span></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <footer class="site">
+    <p class="lang-only-ja">設計レビュー用提案モック（静的・JSなし・外部リソースなし・Spark Scope CSP対応）。すべての測定値・件数・価格内訳は説明用サンプルです。Googleのロゴ・製品は模倣していません。</p>
+    <p class="lang-only-en">Static design-review proposal mock (no JS, no external resources, CSP-compatible). All measurements, counts, and price breakdowns are illustrative. No Google logo or product is imitated.</p>
+  </footer>
+</main>
+</body>
+</html>
