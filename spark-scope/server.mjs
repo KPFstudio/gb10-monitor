@@ -11,6 +11,7 @@ import { hostAllowed, hostRules, SECURITY_HEADERS } from "./lib/http-guard.mjs";
 import { publicState } from "./lib/public-state.mjs";
 import { ThermalHistory } from "./lib/thermal-history.mjs";
 import { loadTopology, nodeInterfaces, publicTopology } from "./lib/topology.mjs";
+import { SwitchMonitor, SWITCH_INTERVAL_MS } from "./lib/switch-monitor.mjs";
 
 // node:sqlite (the token ledger) needs Node 22.13 or later; say so instead of failing on the import.
 const [major, minor] = process.versions.node.split(".").map(Number);
@@ -74,6 +75,10 @@ const topology = loadTopology();
 const nodeDefinitions = topology.nodes.map((node) => ({ ...node, interfaces: nodeInterfaces(topology, node.id) }));
 
 const inferenceCollector = new InferenceCollector(config.apiUrl);
+const switchMonitor = new SwitchMonitor({
+  configPath: process.env.SPARK_SCOPE_SWITCH_CONFIG || path.join(process.env.XDG_CONFIG_HOME || path.join(homedir(), '.config'), 'spark-scope', 'switch.local.json'),
+  historyPath: path.join(dataHome, 'spark-scope', 'switch-history.json'),
+});
 // A ledger that cannot be opened (corrupt file, wrong permissions) turns off token counting, not the dashboard.
 let usageStore = null;
 let usageOpenError = null;
@@ -292,6 +297,7 @@ async function handle(request, response) {
     // history=0 leaves out the samples: pages poll every two seconds and fetch the full history only now and then.
     const withHistory = url.searchParams.get("history") !== "0";
     sendJson(request, response, 200, publicState(state, {
+      switch: switchMonitor.view(),
       history: withHistory ? downsampleHistory(history) : undefined,
       historyStats: summarizeHistory(history, minutes),
       // Canonical thermal statistics (1/5/15m means, 5m max) per node and per sensor, always from the
@@ -299,6 +305,10 @@ async function handle(request, response) {
       thermal: summarizeThermal(thermalHistory.points, Date.now()),
       pollIntervals: { nodeMs: config.nodeIntervalMs, apiMs: config.apiIntervalMs },
     }));
+    return;
+  }
+  if (url.pathname === '/api/switch') {
+    sendJson(request, response, 200, switchMonitor.view());
     return;
   }
   if (url.pathname === "/api/health") {
@@ -340,6 +350,9 @@ const server = createServer((request, response) => {
 });
 
 await Promise.all([collectNodes(), collectInference()]);
+void switchMonitor.collect(); // Do not hold the DGX dashboard behind a switch timeout.
+const switchTimer = setInterval(() => void switchMonitor.collect(), SWITCH_INTERVAL_MS);
+switchTimer.unref();
 const nodeTimer = setInterval(collectNodes, config.nodeIntervalMs);
 const inferenceTimer = setInterval(collectInference, config.apiIntervalMs);
 nodeTimer.unref();
@@ -364,6 +377,7 @@ server.listen(config.port, config.host, () => {
 });
 
 function shutdown() {
+  clearInterval(switchTimer);
   clearInterval(nodeTimer);
   clearInterval(inferenceTimer);
   server.close(() => {

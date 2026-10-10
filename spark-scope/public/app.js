@@ -1,5 +1,6 @@
 import { COLORS, nodeOrder, linkText, UNKNOWN, finite, fixed, compact, duration, tokenRate, gib, escapeHtml as esc, clockTime, eventTime, localDay, monthLabel, dayLabel, monthOptions, chartPath, validateMonth, fabricLayout, labelWidth, nextTheme, topologyKey, staleAfterMs, livePoint, mergeLivePoint, timeoutSignal, onMediaChange, PRICE_META, priceFor, priceEquivalent, priceCardKey } from './view-data.js';
 import { initLanguage, setLanguage, saveLanguage, currentLanguage, t, localeName } from './i18n.js';
+import { switchPanelHtml } from './switch-panel.js';
 const $ = selector => document.querySelector(selector);
 let latest = null, metas = [], lastTopology = null, range = 60, collecting = false, monthSequence = 0, monthLoadedAt = 0, monthController = null, monthUsage = null;
 // The full history is fetched every 30 s and when the range changes; polls in between add their own sample to it.
@@ -198,6 +199,22 @@ async function refresh() {
     if(error?.message==='stale data')failedState();else console.error('Spark Scope could not draw the latest state:',error);
   }finally{collecting=false;if(requestedRange!==range)void refresh()}
 }
+
+// Independent request: an inference/server drawing failure must not mask switch status.
+let collectingSwitch = false;
+async function refreshSwitch() {
+  if (collectingSwitch) return;
+  collectingSwitch = true;
+  const timeout = timeoutSignal(8000);
+  try {
+    const response = await fetch('/api/switch', { cache: 'no-store', signal: timeout.signal });
+    if (!response.ok) throw new Error('request failed');
+    $('#switch-panel').innerHTML = switchPanelHtml(await response.json());
+  } catch { $('#switch-panel').innerHTML = switchPanelHtml({ status: 'connection-failed' }); }
+  finally { timeout.done(); collectingSwitch = false; }
+}
+void refreshSwitch();
+setInterval(() => void refreshSwitch(), 5000);
 
 function rebuildMonths() {
   const locale=localeName(),current=ledgerToday().slice(0,7),choices=monthOptions(earliestMonth,current);
