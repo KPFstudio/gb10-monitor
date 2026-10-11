@@ -137,20 +137,26 @@ kernel_summary="$(
       last = raw
       count++
     }
-    END { printf "%d\t%d\t%d\t%d\t%s\t%s", count+0, no_memory+0, xid+0, count>=1000, epoch, last }
+    END { printf "%d\t%d\t%d\t%d\t%s\t%s", count+0, no_memory+0, xid+0, (count>=1000), epoch, last }
   '
 )"
 kernel_rc="$?"
 case "$kernel_rc" in
-  0) kernel_status="ok" ;;
-  124) kernel_status="timeout" ;;
-  1)
-    if timeout 1s journalctl -q -k --no-pager -n 1 >/dev/null 2>&1; then
+  0|1)
+    kernel_count="$(printf '%s' "$kernel_summary" | cut -f1)"
+    if [ "$kernel_rc" = 0 ] && [ "$kernel_count" -gt 0 ]; then
       kernel_status="ok"
     else
       kernel_status="unavailable"
+      # A successful journalctl with empty output also occurs without journal access.
+      # Zero faults is trustworthy only after an actual unfiltered kernel entry is read.
+      kernel_probe="$(timeout 1s journalctl -q -k --no-pager -o short-unix -n 1 2>/dev/null)"
+      if [ "$?" = 0 ] && printf '%s\n' "$kernel_probe" | awk '$1 ~ /^[0-9]+(\.[0-9]+)?$/ {found=1} END {exit !found}'; then
+        kernel_status="ok"
+      fi
     fi
     ;;
+  124|137) kernel_status="timeout" ;;
   *) kernel_status="unavailable" ;;
 esac
 line kernel "$kernel_status	$kernel_summary"
