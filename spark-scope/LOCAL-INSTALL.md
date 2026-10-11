@@ -74,3 +74,11 @@ ready ranks (0–3) were checked alongside the switch judgments. Mia TensorFold
 migration is still incomplete; the staged model/image files are retained. DGX4's
 lower clock was reproduced under an actual application request without a reported
 thermal or power-brake event. Its cause and performance implications remain unknown.
+
+Kernel-fault counts are available only after a real kernel journal entry can be read.
+An empty successful `journalctl` is insufficient: an unprivileged account may receive
+that output without journal access. The bounded collector now reports those cases as
+unavailable, and the existing node panel shows that the journal cannot be checked.
+DGX4 was verified in this state; zero recorded faults must not be used to clear its
+clock/power investigation. Nine isolated journal scenarios and all 151 Scope tests
+passed. No journal permissions, GPU clock limits, drivers or LLM containers changed.
