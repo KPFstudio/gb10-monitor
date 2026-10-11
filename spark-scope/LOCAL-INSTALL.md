@@ -5,7 +5,7 @@ Monitor. Upstream details are in `UPSTREAM.md`.
 
 - The local LaunchAgent runs Node from `/Users/kobayashipf/.local/bin/node`.
 - The app binds only to `127.0.0.1:8914`.
-- Its vLLM endpoint is the existing loopback SSH forward at
+- Its inference endpoint is the existing loopback SSH forward at
   `http://127.0.0.1:8093`; no additional SSH key or forward is used.
 - `topology.local.json` uses the existing `dgx1`–`dgx4` SSH aliases and collects the
   four machines independently.
@@ -71,7 +71,7 @@ missing readings, acquisition failure and stale data without changing the device
 The actual Tailscale `:8914` page was also opened in the dedicated browser. After
 returning to the original GLM-5.3-Flash-FP8 containers, its model name and all four
 ready ranks (0–3) were checked alongside the switch judgments. Mia TensorFold
-migration is still incomplete; the staged model/image files are retained. DGX4's
+migration was incomplete at 03:10 JST; the staged model/image files were retained. The current 04:38 JST EXL3 deployment is documented below. DGX4's
 lower clock was reproduced under an actual application request without a reported
 thermal or power-brake event. Its cause and performance implications remain unknown.
 
@@ -82,3 +82,21 @@ unavailable, and the existing node panel shows that the journal cannot be checke
 DGX4 was verified in this state; zero recorded faults must not be used to clear its
 clock/power investigation. Nine isolated journal scenarios and all 151 Scope tests
 passed. No journal permissions, GPU clock limits, drivers or LLM containers changed.
+
+## TensorFold TP4 monitoring (2026-10-12)
+
+The Mia TensorFold EXL3 workload now serves the existing :8093 endpoint, with four
+actual ranks. Node identity is derived from the live GPU-owning process and a
+sanitized engine/rank marker, not from a container name alone. The process must
+be alive; rank is limited to 0–3. The Tailscale page rendered the new model name,
+TensorFold, ready ranks 0–3 and the CRS812's 21 sensors and judgments.
+
+TensorFold's completed-request prompt/generation counters, running/waiting gauges,
+MTP draft/accept counters and TTFT histogram are normalized to the dashboard's
+existing parser. KV usage comes from /health's shared pool_tokens/pool_free_tokens,
+not from an average of per-stream context fullness. Prefill time, per-token time,
+cache-hit rate and request-success metrics are not invented when unavailable.
+All 154 Scope tests pass, including live GPU ownership/rank validation and missing
+or inconsistent pool data. No switch controls, host network, GPU clock limits or
+drivers were changed. The earlier FP8 recovery above is a historical observation;
+the current model is Mia EXL3. DGX4 clock/power uncertainties remain open.
