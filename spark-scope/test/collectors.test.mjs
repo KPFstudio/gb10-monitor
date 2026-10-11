@@ -8,6 +8,7 @@ import {
   collectorCommand,
   knownEngine,
   metricsEngine,
+  normalizeTensorFoldMetrics,
   parseNetworkLines,
   histogramQuantile,
   holdPrefillRates,
@@ -573,4 +574,50 @@ test("a missing ssh binary is reported instead of crashing the poll", async () =
   const node = await withFakeCommand("unrelated", "exit 0", () => collectNode({ id: "9", name: "spark-9", host: "spark-9" }), { onlyFake: true });
   assert.equal(node.ok, false);
   assert.match(node.error, /ENOENT/);
+});
+
+
+test("TensorFold metrics preserve their meanings and keep unsupported timings unknown", () => {
+  const metrics = parsePrometheus(`tensorfold:requests_running 2
+ tensorfold:requests_waiting 1
+ tensorfold:prompt_tokens_total 120
+ tensorfold:generation_tokens_total 40
+ tensorfold:mtp_drafted_total 20
+ tensorfold:mtp_accepted_total 15
+ tensorfold:time_to_first_token_seconds_bucket{le="1"} 3
+ tensorfold:time_to_first_token_seconds_bucket{le="+Inf"} 4
+ tensorfold:time_to_first_token_seconds_sum 2.3
+ tensorfold:time_to_first_token_seconds_count 4
+ tensorfold_health:pool_tokens 1000
+ tensorfold_health:pool_free_tokens 750`.replace(/^ /gm,""));
+  assert.equal(metricsEngine(metrics), "TensorFold");
+  normalizeTensorFoldMetrics(metrics);
+  assert.equal(metricSum(metrics,"vllm:num_requests_running"),2);
+  assert.equal(metricSum(metrics,"vllm:num_requests_waiting"),1);
+  assert.equal(metricSum(metrics,"vllm:prompt_tokens_total"),120);
+  assert.equal(metricSum(metrics,"vllm:kv_cache_usage_perc"),0.25);
+  assert.equal(metricSum(metrics,"vllm:spec_decode_num_accepted_tokens_total"),15);
+  assert.equal(metricSum(metrics,"vllm:time_to_first_token_seconds_count"),4);
+  for (const name of ["vllm:request_success_total","vllm:request_prefill_time_seconds_sum","vllm:request_time_per_output_token_seconds_count","vllm:prefix_cache_hits_total"]) {
+    assert.equal(metrics.has(name),false);
+  }
+});
+
+test("TensorFold pool percentage stays unknown for absent or inconsistent pool telemetry", () => {
+  for (const text of ["tensorfold:requests_running 0", "tensorfold_health:pool_tokens 10\ntensorfold_health:pool_free_tokens 20"]) {
+    const metrics = normalizeTensorFoldMetrics(parsePrometheus(text));
+    assert.equal(metrics.has("vllm:kv_cache_usage_perc"),false);
+  }
+  assert.equal(knownEngine("python3"),null);
+  assert.equal(knownEngine("tensorfold-glm53:v0.6.0"),"TensorFold");
+});
+
+
+test("TensorFold rank requires a live GPU process and a sanitized recognized command identity", async () => {
+  for (const [state,identity,expected] of [["S","tensorfold,0",0],["S","tensorfold,3",3],["S","tensorfold,9",null],["S","python3,2",null],["Z","tensorfold,1",null]]) {
+    const output = `hostname|fixture\nprocess|42,/usr/bin/python3,N/A,${state}\nprocess_identity|${identity}\ncontainer|/tensorfold-test,tensorfold-glm53:v0.6.0,true,0,`;
+    const node = await withFakeCommand("ssh", `cat >/dev/null\ncat <<'FIXTURE'\n${output}\nFIXTURE`, () => collectNode({ id:"fixture",name:"fixture",host:"fixture" }));
+    assert.equal(node.inference.rank,expected);
+    if (expected !== null) assert.equal(node.inference.engine,"TensorFold");
+  }
 });

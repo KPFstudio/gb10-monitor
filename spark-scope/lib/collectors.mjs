@@ -63,6 +63,19 @@ if [ -n "$process_pid" ] && [ -r "/proc/$process_pid/status" ]; then
 fi
 line process "$process,$process_state"
 
+# Publish only a recognized engine/rank, never full command arguments.
+process_identity=""
+if [ -n "$process_pid" ] && [ -r "/proc/$process_pid/cmdline" ]; then
+  process_identity="$(tr '\0' '\n' < "/proc/$process_pid/cmdline" | awk '
+    NR <= 3 && $0 ~ /(^|\/)tensorfold$/ {engine=1}
+    NR <= 4 && $0 == "serve" {serve=1}
+    previous == "--rank" && $0 ~ /^[0-3]$/ {rank=$0}
+    {previous=$0}
+    END {if (engine && serve && rank != "") printf "tensorfold,%s",rank}
+  ' 2>/dev/null || true)"
+fi
+line process_identity "$process_identity"
+
 container_id=""
 if [ -n "$process_pid" ] && [ -r "/proc/$process_pid/cgroup" ]; then
   container_id="$(grep -oE '[0-9a-f]{64}' "/proc/$process_pid/cgroup" 2>/dev/null | head -1 || true)"
@@ -70,7 +83,7 @@ fi
 # Optional: only when docker is installed and readable by this account, and only for a container that
 # holds the GPU process or whose name or image names a known inference engine.
 if [ -z "$container_id" ]; then
-  container_id="$(limit 1.5 docker ps --format '{{.ID}} {{.Names}} {{.Image}}' 2>/dev/null | awk '{line=tolower($0)} line ~ /vllm|sglang|llama|triton|tensorrt|trtllm/{print $1; exit}' || true)"
+  container_id="$(limit 1.5 docker ps --format '{{.ID}} {{.Names}} {{.Image}}' 2>/dev/null | awk '{line=tolower($0)} line ~ /vllm|sglang|llama|triton|tensorrt|trtllm|tensorfold/{print $1; exit}' || true)"
 fi
 container=",,false,0,"
 if [ -n "$container_id" ]; then
@@ -216,6 +229,7 @@ function splitCsv(value) {
 // Known serving engines only; anything else (python3, a benchmark) is not an engine label.
 export function knownEngine(text) {
   const normalized = String(text ?? "").toLowerCase();
+  if (normalized.includes("tensorfold")) return "TensorFold";
   if (normalized.includes("vllm")) return "vLLM";
   if (normalized.includes("sglang")) return "SGLang";
   if (normalized.includes("ollama")) return "Ollama";
@@ -408,13 +422,18 @@ function nodeSnapshot(lines, { id, name, host, local, role, expectedRank, interf
   const disk = splitCsv(lines.disk);
   const container = splitCsv(lines.container);
   const inference = parseInferenceProcess(lines.process);
+  const [identityEngine, identityRank] = splitCsv(lines.process_identity);
+  if (inference.alive && identityEngine === "tensorfold" && /^[0-3]$/.test(identityRank)) {
+    inference.rank = Number(identityRank);
+    inference.engine = "TensorFold";
+  }
   const thermals = parseThermals(lines.thermals);
   const hwmon = parseHwmon(lines.hwmon);
   const kernelEvents = parseKernelEvents(lines.kernel);
   const totalMemoryBytes = kibibytes(memory[0]);
   const availableMemoryBytes = kibibytes(memory[1]);
   const engine = inference.up
-    ? knownEngine(inference.processName) ?? knownEngine(container[1]) ?? knownEngine(container[0])
+    ? knownEngine(inference.engine) ?? knownEngine(inference.processName) ?? knownEngine(container[1]) ?? knownEngine(container[0])
     : null;
   const gpuReadings = {
     utilization: number(gpu[0]),
@@ -648,8 +667,37 @@ export function metricsEngine(metrics) {
   for (const name of metrics.keys()) {
     if (name.startsWith("vllm:")) return "vLLM";
     if (name.startsWith("sglang:")) engine = "SGLang";
+    if (name.startsWith("tensorfold:")) engine = "TensorFold";
   }
   return engine;
+}
+
+// TensorFold's request counters and TTFT have matching meanings. Fields without
+// equivalent telemetry (per-token timing, cache hits, prefill time) stay unknown.
+export function normalizeTensorFoldMetrics(metrics) {
+  const mapping = {
+    "vllm:generation_tokens_total": "tensorfold:generation_tokens_total",
+    "vllm:prompt_tokens_total": "tensorfold:prompt_tokens_total",
+    "vllm:num_requests_running": "tensorfold:requests_running",
+    "vllm:num_requests_waiting": "tensorfold:requests_waiting",
+    "vllm:spec_decode_num_draft_tokens_total": "tensorfold:mtp_drafted_total",
+    "vllm:spec_decode_num_accepted_tokens_total": "tensorfold:mtp_accepted_total",
+    "vllm:time_to_first_token_seconds_bucket": "tensorfold:time_to_first_token_seconds_bucket",
+    "vllm:time_to_first_token_seconds_sum": "tensorfold:time_to_first_token_seconds_sum",
+    "vllm:time_to_first_token_seconds_count": "tensorfold:time_to_first_token_seconds_count",
+  };
+  for (const [target, source] of Object.entries(mapping)) {
+    if (!metrics.has(target) && metrics.has(source)) {
+      metrics.set(target, metrics.get(source).map(sample => ({ ...sample, name: target })));
+    }
+  }
+  // This ratio uses the shared pool, rather than averaging per-stream context fullness.
+  const pool = metricValue(metrics, "tensorfold_health:pool_tokens", {}, null);
+  const free = metricValue(metrics, "tensorfold_health:pool_free_tokens", {}, null);
+  if (pool > 0 && free >= 0 && free <= pool && !metrics.has("vllm:kv_cache_usage_perc")) {
+    metrics.set("vllm:kv_cache_usage_perc", [{ name: "vllm:kv_cache_usage_perc", labels: {}, value: (pool-free)/pool }]);
+  }
+  return metrics;
 }
 
 // SGLang exposes its own metric names. Add the vLLM names this collector reads, so
@@ -798,6 +846,7 @@ export class InferenceCollector {
       const metrics = parsePrometheus(await metricsResult.response.text());
       const engine = metricsEngine(metrics);
       if (engine === "SGLang") normalizeSglangMetrics(metrics);
+      if (engine === "TensorFold") normalizeTensorFoldMetrics(metrics);
       const metricModelName = resolveModelIdentity(metrics).modelName;
       const modelCacheExpired = collectedAt - this.modelsFetchedAt >= 30_000;
       const modelCacheMiss = metricModelName && !this.models.some((model) => model?.id === metricModelName);
