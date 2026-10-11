@@ -67,3 +67,10 @@ Verification: 150 Spark Scope tests, 19 Internal Home tests and seven focused AP
 tests passed. The actual browser showed both live views. Ten browser-only mocked cases
 covered normal, PSU failure/input loss/idle, fan failure, temperature rise/overtemperature,
 missing readings, acquisition failure and stale data without changing the device.
+
+The actual Tailscale `:8914` page was also opened in the dedicated browser. After
+returning to the original GLM-5.3-Flash-FP8 containers, its model name and all four
+ready ranks (0–3) were checked alongside the switch judgments. Mia TensorFold
+migration is still incomplete; the staged model/image files are retained. DGX4's
+lower clock was reproduced under an actual application request without a reported
+thermal or power-brake event. Its cause and performance implications remain unknown.
