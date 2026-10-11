@@ -191,6 +191,44 @@ test("the bounded kernel journal summary yields counts and the last message", ()
   assert.equal(unavailable.status, "unavailable");
 });
 
+test("kernel collection distinguishes readable zero faults from unreadable or empty journals", () => {
+  const script = buildRemoteScript([]);
+  const fragment = script.slice(script.indexOf('kernel_summary="$('), script.indexOf('\nnetwork_line()'));
+  const cases = [
+    { name: "unreadable empty success", filtered: "", filteredRc: 0, probe: "", probeRc: 0, status: "unavailable" },
+    { name: "unreadable no matches", filtered: "", filteredRc: 1, probe: "", probeRc: 0, status: "unavailable" },
+    { name: "permission denied", filtered: "", filteredRc: 1, probe: "", probeRc: 1, status: "unavailable" },
+    { name: "empty journal message", filtered: "", filteredRc: 1, probe: "-- No entries --", probeRc: 0, status: "unavailable" },
+    { name: "readable no matches", filtered: "", filteredRc: 1, probe: "1791730000 host kernel: Linux boot", probeRc: 0, status: "ok" },
+    { name: "readable empty success", filtered: "", filteredRc: 0, probe: "1791730000 host kernel: Linux boot", probeRc: 0, status: "ok" },
+    { name: "timeout", filtered: "", filteredRc: 124, probe: "", probeRc: 0, status: "timeout" },
+    { name: "timeout killed", filtered: "", filteredRc: 137, probe: "", probeRc: 0, status: "timeout" },
+    { name: "actual fault", filtered: "1791730000 host kernel: NVRM: Xid 79", filteredRc: 0, probe: "", probeRc: 1, status: "ok", xid: 1 },
+  ];
+  // Functions replace journalctl/timeout only in this isolated shell fixture.
+  for (const fixture of cases) {
+    const program = `set -u\nset -o pipefail
+line() { printf '%s|%s\\n' "$1" "$2"; }
+timeout() { shift; "$@"; }
+journalctl() {
+  case " $* " in
+    *" -g "*) printf '%s' "$FILTERED"; return "$FILTERED_RC" ;;
+    *) printf '%s' "$PROBE"; return "$PROBE_RC" ;;
+  esac
+}
+${fragment}`;
+    const run = spawnSync("bash", ["-c", program], { encoding: "utf8", env: {
+      ...process.env, FILTERED: fixture.filtered, FILTERED_RC: String(fixture.filteredRc),
+      PROBE: fixture.probe, PROBE_RC: String(fixture.probeRc),
+    } });
+    assert.equal(run.status, 0, `${fixture.name}: ${run.stderr}`);
+    const result = parseKernelEvents(run.stdout.trimEnd().replace(/^kernel\|/, ""));
+    assert.equal(result.status, fixture.status, fixture.name);
+    assert.equal(result.available, fixture.status === "ok", fixture.name);
+    if (fixture.xid) assert.equal(result.xid, fixture.xid, fixture.name);
+  }
+});
+
 test("Gb/s rates come from the network counters of two snapshots", () => {
   const previous = {
     ok: true,
